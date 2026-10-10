@@ -28,6 +28,7 @@ export const BookingModal: React.FC = () => {
     isBookingOpen, 
     setIsBookingOpen, 
     setIsCabinetOpen,
+    clientProfile,
     services, 
     masters, 
     addBooking, 
@@ -62,6 +63,14 @@ export const BookingModal: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'mbank' | 'odengi' | 'optima' | 'card' | 'cash'>('mbank');
 
   const [confirmedBooking, setConfirmedBooking] = useState<any | null>(null);
+
+  // Fill contact details from the client's account
+  useEffect(() => {
+    if (isBookingOpen && clientProfile) {
+      setClientName(prev => prev.trim() ? prev : clientProfile.name);
+      setClientPhone(clientProfile.phone);
+    }
+  }, [isBookingOpen, clientProfile]);
 
   // Sync with preselected values if opened from a button
   useEffect(() => {
@@ -511,9 +520,13 @@ export const BookingModal: React.FC = () => {
                   required
                   value={clientPhone}
                   onChange={e => setClientPhone(e.target.value)}
+                  readOnly={Boolean(clientProfile)}
                   placeholder="+996 700 910 777"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 read-only:text-slate-400"
                 />
+                {clientProfile && (
+                  <span className="mt-1 block text-[10px] text-slate-500">Номер из вашего личного кабинета</span>
+                )}
               </div>
             </div>
 
@@ -621,8 +634,7 @@ export const BookingModal: React.FC = () => {
               <div className="text-xs font-bold text-slate-200">Ваш номер записи</div>
               <div className="text-2xl font-black font-mono text-amber-400 tracking-wide select-all">{confirmedBooking.id}</div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Сохраните его. Зарегистрируйтесь в личном кабинете по номеру {confirmedBooking.clientPhone}, чтобы
-                следить за статусом заказа с любого устройства — при регистрации понадобится этот номер записи.
+                Запись сохранена в вашем личном кабинете — там можно следить за статусом заказа с любого устройства.
               </p>
               <button
                 onClick={() => {

@@ -45,6 +45,8 @@ export const UserCabinetModal: React.FC = () => {
     clientClaimBooking,
     clientLogout,
     refreshClientBookings,
+    pendingBooking,
+    setPendingBooking,
     addNotification,
   } = useApp();
 
@@ -84,7 +86,13 @@ export const UserCabinetModal: React.FC = () => {
 
   const close = () => {
     setIsCabinetOpen(false);
+    setPendingBooking(false);
     setLoginError(null);
+  };
+
+  const startBooking = () => {
+    setIsCabinetOpen(false);
+    setIsBookingOpen(true);
   };
 
   const warrantyYearsFor = (b: Booking) => services.find((s) => s.id === b.serviceId)?.warrantyYears;
@@ -213,6 +221,12 @@ export const UserCabinetModal: React.FC = () => {
             </div>
           </div>
 
+          {pendingBooking && (
+            <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 leading-relaxed">
+              Чтобы записаться, войдите или зарегистрируйтесь — это займёт минуту. Запись появится в вашем кабинете.
+            </p>
+          )}
+
           <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800">
             {(['login', 'register'] as const).map((mode) => (
               <button
@@ -312,17 +326,6 @@ export const UserCabinetModal: React.FC = () => {
             </p>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              close();
-              setIsBookingOpen(true);
-            }}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
-          >
-            <CalendarPlus className="w-4 h-4 text-amber-400" />
-            Записаться без регистрации
-          </button>
         </form>
       </div>
     );
@@ -347,6 +350,13 @@ export const UserCabinetModal: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={startBooking}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-xs font-extrabold text-slate-950 cursor-pointer"
+            >
+              <CalendarPlus className="w-3.5 h-3.5" />
+              <span>Новая запись</span>
+            </button>
             <button
               onClick={() => refreshClientBookings()}
               disabled={isClientLoading}
@@ -414,7 +424,18 @@ export const UserCabinetModal: React.FC = () => {
             </div>
 
             {sortedBookings.length === 0 && (
-              <p className="text-sm text-slate-400">{isClientLoading ? 'Загружаем ваши записи…' : 'Записей пока нет.'}</p>
+              <div className="p-6 rounded-2xl bg-slate-950 border border-dashed border-slate-700 text-center space-y-3">
+                <p className="text-sm text-slate-400">{isClientLoading ? 'Загружаем ваши записи…' : 'У вас пока нет записей.'}</p>
+                {!isClientLoading && (
+                  <button
+                    onClick={startBooking}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-xs font-extrabold text-slate-950 cursor-pointer"
+                  >
+                    <CalendarPlus className="w-4 h-4" />
+                    Записаться в студию
+                  </button>
+                )}
+              </div>
             )}
 
             <form onSubmit={submitClaim} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">

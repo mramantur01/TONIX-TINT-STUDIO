@@ -67,9 +67,17 @@ const telegramText = (b) =>
 export default async function handler(req, res) {
   try {
     if (req.method === 'POST') {
-      const booking = sanitize(readBody(req));
+      // Booking is only available from a client account (the admin may also create bookings).
       const clientKey = clientFromRequest(req);
-      if (clientKey) booking.userId = clientKey; // booked while signed in to the cabinet
+      const user = clientKey ? await getJson(`user:${clientKey}`) : null;
+      if (!user && !isAdmin(req)) return send(res, 401, { error: 'login_required' });
+
+      const booking = sanitize(readBody(req));
+      if (user) {
+        booking.userId = clientKey;
+        booking.clientPhone = user.phone; // bookings always carry the account's phone
+        if (!booking.clientName) booking.clientName = user.name;
+      }
       if (!booking.clientName || !booking.clientPhone || !booking.bookingDate || !booking.bookingTime) {
         return send(res, 400, { error: 'missing_fields' });
       }

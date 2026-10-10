@@ -166,6 +166,8 @@ interface AppContextType {
   clientBookings: Booking[];
   clientProfile: ClientProfile | null;
   isClientLoggedIn: boolean;
+  pendingBooking: boolean;
+  setPendingBooking: (value: boolean) => void;
   isClientLoading: boolean;
   clientLogin: (phone: string, password: string) => Promise<ClientAuthResult>;
   clientRegister: (data: { name: string; phone: string; password: string; bookingId?: string }) => Promise<ClientAuthResult>;
@@ -307,7 +309,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   // Modals
-  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isBookingOpen, setIsBookingOpenState] = useState(false);
+  // Booking requires a client account: remember that the visitor wanted to book while they sign in.
+  const [pendingBooking, setPendingBooking] = useState(false);
   const [isCabinetOpen, setIsCabinetOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState<AdminTab>('orders');
@@ -551,6 +555,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsClientLoggedIn(true);
     setClientProfile(data.profile);
     setClientBookings(data.bookings);
+    if (data.token && pendingBooking) {
+      // The visitor signed in to book: continue straight to the booking form.
+      setPendingBooking(false);
+      setIsCabinetOpen(false);
+      setIsBookingOpenState(true);
+    }
   };
 
   const toAuthResult = (err: unknown): ClientAuthResult => {
@@ -915,6 +925,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addNotification('Работа удалена', 'Проект удален из портфолио.', 'info');
   };
 
+  // Booking is only available to signed-in clients (the admin and local dev can always open it).
+  const setIsBookingOpen = (open: boolean) => {
+    if (open && !isClientLoggedIn && !getAdminToken() && !DEV_MODE) {
+      setPendingBooking(true);
+      setIsCabinetOpen(true);
+      return;
+    }
+    setIsBookingOpenState(open);
+  };
+
   const openBookingWithPreselect = (serviceId?: string, carCategory?: CarCategory) => {
     setBookingPreselection({ serviceId, carCategory });
     setIsBookingOpen(true);
@@ -1005,6 +1025,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clientBookings,
         clientProfile,
         isClientLoggedIn,
+        pendingBooking,
+        setPendingBooking,
         isClientLoading,
         clientLogin,
         clientRegister,
