@@ -422,6 +422,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(LOCAL_STORAGE_KEYS.LANG, lang);
   };
 
+  // App shortcuts (long-press on the installed app icon): ?action=book / ?action=cabinet
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    if (!action) return;
+    if (action === 'cabinet') setIsCabinetOpen(true);
+    if (action === 'book') setIsBookingOpen(true);
+    params.delete('action');
+    const query = params.toString();
+    history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Hidden admin access: URL hash (#admin) or hotkey (Alt+A / Ctrl+Shift+A)
   useEffect(() => {
     const handleHashCheck = () => {

@@ -17,6 +17,7 @@ import { UserCabinetModal } from './components/UserCabinetModal';
 import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { LiveChatWidget } from './components/LiveChatWidget';
+import { InstallAppBanner } from './components/InstallAppBanner';
 
 function MainLayout() {
   const { isAdminAuthed } = useApp();
@@ -46,6 +47,7 @@ function MainLayout() {
       <UserCabinetModal />
       {isAdminAuthed ? <AdminDashboardModal /> : <AdminLoginModal />}
       <LiveChatWidget />
+      <InstallAppBanner />
     </div>
   );
 }
