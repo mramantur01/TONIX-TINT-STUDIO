@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Booking, Master, ServiceItem, HeroSlide, GalleryItem, Review } from '../types';
 import { compressImageFile } from '../utils/imageUtils';
+import { AdminClientsTab } from './AdminClientsTab';
 import { 
   X, 
   LogOut,
@@ -960,6 +961,7 @@ export const AdminDashboardModal: React.FC = () => {
             { id: 'portfolio', label: '📸 Портфолио (До/После)', icon: ImageIcon, badge: portfolioItems.length },
             { id: 'reviews', label: '⭐ Отзывы клиентов', icon: Star, badge: reviews.length },
             { id: 'schedule', label: '⏰ График и Контакты', icon: Clock },
+            { id: 'clients', label: '🔑 Клиенты и пароли', icon: Users },
             { id: 'telegram', label: '🤖 Telegram & Вебхуки', icon: Send }
           ].map(tab => {
             const Icon = tab.icon;
@@ -3300,6 +3302,8 @@ export const AdminDashboardModal: React.FC = () => {
           )}
 
           {/* TAB 5: TELEGRAM & WEBHOOKS */}
+          {activeTab === 'clients' && <AdminClientsTab />}
+
           {activeTab === 'telegram' && (
             <div className="space-y-6">
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">

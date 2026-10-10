@@ -27,7 +27,12 @@ const userKey = (key) => `user:${key}`;
 const slow = () => new Promise((r) => setTimeout(r, 800));
 const normId = (value) => String(value ?? '').trim().toUpperCase().replace(/^#/, '');
 
-const profileOf = (user) => ({ name: user.name, phone: user.phone, createdAt: user.createdAt });
+const profileOf = (user) => ({
+  name: user.name,
+  phone: user.phone,
+  createdAt: user.createdAt,
+  mustChangePassword: Boolean(user.mustChangePassword), // signed in with a temporary password from the studio
+});
 
 function visibleBookings(all, user, key) {
   return all.filter(
@@ -92,6 +97,22 @@ export default async function handler(req, res) {
         profile: profileOf(user),
         bookings: visibleBookings(all, user, key),
       });
+    }
+
+    if (body.action === 'change_password') {
+      const key = clientFromRequest(req);
+      const user = key && (await getJson(userKey(key)));
+      if (!user) return send(res, 401, { error: 'unauthorized' });
+      if (!verifyPassword(body.oldPassword ?? '', user.salt, user.hash)) {
+        await slow();
+        return send(res, 403, { error: 'wrong_password' });
+      }
+      const newPassword = String(body.newPassword ?? '');
+      if (newPassword.length < 6) return send(res, 400, { error: 'weak_password' });
+      const { salt, hash } = hashPassword(newPassword);
+      const updated = { ...user, salt, hash, mustChangePassword: false };
+      await setJson(userKey(key), updated);
+      return send(res, 200, { profile: profileOf(updated) });
     }
 
     if (body.action === 'claim') {

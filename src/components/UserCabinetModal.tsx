@@ -13,6 +13,8 @@ import {
   KeyRound,
   CalendarPlus,
   Plus,
+  MessageCircle,
+  Lock,
 } from 'lucide-react';
 import { Booking } from '../types';
 import { TonixLogo } from './TonixLogo';
@@ -43,6 +45,7 @@ export const UserCabinetModal: React.FC = () => {
     clientLogin,
     clientRegister,
     clientClaimBooking,
+    clientChangePassword,
     clientLogout,
     refreshClientBookings,
     pendingBooking,
@@ -62,6 +65,12 @@ export const UserCabinetModal: React.FC = () => {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [claimInput, setClaimInput] = useState('');
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [oldPw, setOldPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [newPw2, setNewPw2] = useState('');
+  const [pwMessage, setPwMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pwSaving, setPwSaving] = useState(false);
 
   const sortedBookings = useMemo(
     () => [...clientBookings].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')),
@@ -187,6 +196,44 @@ export const UserCabinetModal: React.FC = () => {
         return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">Отменён</span>;
       default:
         return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-slate-300">Ожидает визита</span>;
+    }
+  };
+
+  // "Forgot password": open WhatsApp to the studio with a ready-made message.
+  const forgotPasswordLink = () => {
+    const studioDigits = (studioSettings.whatsapp || studioSettings.phone || '').replace(/\D/g, '');
+    const text = `Здравствуйте! Я забыл пароль от личного кабинета на сайте TONIX. Мой номер: ${
+      phoneInput.trim() || '___'
+    }. Помогите, пожалуйста, восстановить доступ.`;
+    return `https://wa.me/${studioDigits}?text=${encodeURIComponent(text)}`;
+  };
+
+  const submitPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pwSaving) return;
+    if (newPw !== newPw2) {
+      setPwMessage({ ok: false, text: 'Новые пароли не совпадают.' });
+      return;
+    }
+    setPwSaving(true);
+    const result = await clientChangePassword(oldPw, newPw);
+    setPwSaving(false);
+    if (result === 'ok') {
+      setOldPw('');
+      setNewPw('');
+      setNewPw2('');
+      setShowPasswordForm(false);
+      setPwMessage({ ok: true, text: 'Пароль изменён.' });
+    } else {
+      setPwMessage({
+        ok: false,
+        text:
+          result === 'wrong_password'
+            ? 'Текущий пароль указан неверно.'
+            : result === 'weak_password'
+            ? 'Новый пароль должен быть не короче 6 символов.'
+            : AUTH_ERRORS.error,
+      });
     }
   };
 
@@ -321,9 +368,20 @@ export const UserCabinetModal: React.FC = () => {
           </button>
 
           {!isRegister && (
-            <p className="text-[11px] text-slate-500 text-center">
-              Забыли пароль? Позвоните нам: {studioSettings.phone}
-            </p>
+            <div className="text-center space-y-1">
+              <a
+                href={forgotPasswordLink()}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                Забыли пароль? Напишите нам в WhatsApp
+              </a>
+              <p className="text-[11px] text-slate-500">
+                Мы пришлём временный пароль. Или позвоните: {studioSettings.phone}
+              </p>
+            </div>
           )}
 
         </form>
@@ -367,6 +425,17 @@ export const UserCabinetModal: React.FC = () => {
               <span className="hidden sm:inline">Обновить</span>
             </button>
             <button
+              onClick={() => {
+                setShowPasswordForm((v) => !v);
+                setPwMessage(null);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 cursor-pointer"
+              title="Сменить пароль"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Пароль</span>
+            </button>
+            <button
               onClick={clientLogout}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-red-900/60 text-xs font-bold text-slate-200 cursor-pointer"
               title="Выйти из кабинета"
@@ -383,6 +452,72 @@ export const UserCabinetModal: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Temporary password notice + change password form */}
+        {(clientProfile?.mustChangePassword || showPasswordForm || pwMessage) && (
+          <div className="px-6 pt-5 space-y-3">
+            {clientProfile?.mustChangePassword && !showPasswordForm && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
+                <p className="text-xs text-amber-300">Вы вошли по временному паролю. Придумайте свой пароль.</p>
+                <button
+                  onClick={() => setShowPasswordForm(true)}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold cursor-pointer"
+                >
+                  Сменить
+                </button>
+              </div>
+            )}
+            {showPasswordForm && (
+              <form onSubmit={submitPasswordChange} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
+                <div className="text-xs font-bold text-slate-200">Смена пароля</div>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder={clientProfile?.mustChangePassword ? 'Временный пароль' : 'Текущий пароль'}
+                  value={oldPw}
+                  onChange={(e) => setOldPw(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                />
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Новый пароль (не короче 6 символов)"
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                />
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Повторите новый пароль"
+                  value={newPw2}
+                  onChange={(e) => setNewPw2(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={!oldPw || !newPw || !newPw2 || pwSaving}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-extrabold cursor-pointer"
+                  >
+                    {pwSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Сохранить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordForm(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 cursor-pointer"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </form>
+            )}
+            {pwMessage && (
+              <p className={`text-xs ${pwMessage.ok ? 'text-emerald-400' : 'text-red-400'}`}>{pwMessage.text}</p>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center border-b border-slate-800 bg-slate-950/40 px-6 gap-2 overflow-x-auto">

@@ -112,7 +112,7 @@ export const createReview = (review: Omit<Review, 'id' | 'date' | 'likes' | 'ver
 export const deletePublicReview = (id: string) =>
   request<{ ok: boolean }>(`/api/reviews?id=${encodeURIComponent(id)}`, { method: 'DELETE' }, true);
 
-export type ClientProfile = { name: string; phone: string; createdAt: string };
+export type ClientProfile = { name: string; phone: string; createdAt: string; mustChangePassword?: boolean };
 type AccountResponse = { token?: string; profile: ClientProfile; bookings: Booking[] };
 
 export const fetchAccount = () => request<AccountResponse>('/api/account');
@@ -125,3 +125,21 @@ export const loginAccount = (phone: string, password: string) =>
 
 export const claimBooking = (bookingId: string) =>
   request<{ bookings: Booking[] }>('/api/account', { method: 'POST', body: JSON.stringify({ action: 'claim', bookingId }) });
+
+export const changePassword = (oldPassword: string, newPassword: string) =>
+  request<{ profile: ClientProfile }>('/api/account', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'change_password', oldPassword, newPassword }),
+  });
+
+export type AdminClient = { name: string; phone: string; createdAt: string; bookings: number; mustChangePassword: boolean };
+
+export const fetchClients = (q = '') =>
+  request<{ clients: AdminClient[] }>(`/api/clients${q ? `?q=${encodeURIComponent(q)}` : ''}`, {}, true);
+
+export const resetClientPassword = (phone: string) =>
+  request<{ tempPassword: string; name: string; phone: string }>(
+    '/api/clients',
+    { method: 'POST', body: JSON.stringify({ action: 'reset', phone }) },
+    true
+  );

@@ -14,6 +14,7 @@ import {
   registerAccount,
   loginAccount,
   claimBooking,
+  changePassword,
   getClientToken,
   setClientToken,
   type ClientProfile,
@@ -36,7 +37,8 @@ export type AdminTab =
   | 'schedule' 
   | 'portfolio' 
   | 'reviews' 
-  | 'telegram';
+  | 'telegram'
+  | 'clients';
 
 export interface StudioSettings {
   studioName: string;
@@ -172,6 +174,7 @@ interface AppContextType {
   clientLogin: (phone: string, password: string) => Promise<ClientAuthResult>;
   clientRegister: (data: { name: string; phone: string; password: string; bookingId?: string }) => Promise<ClientAuthResult>;
   clientClaimBooking: (bookingId: string) => Promise<'ok' | 'not_found' | 'error'>;
+  clientChangePassword: (oldPassword: string, newPassword: string) => Promise<'ok' | 'wrong_password' | 'weak_password' | 'error'>;
   clientLogout: () => void;
   refreshClientBookings: () => Promise<void>;
 
@@ -626,6 +629,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const clientChangePassword = async (
+    oldPassword: string,
+    newPassword: string
+  ): Promise<'ok' | 'wrong_password' | 'weak_password' | 'error'> => {
+    try {
+      const { profile } = await changePassword(oldPassword, newPassword);
+      setClientProfile(profile);
+      return 'ok';
+    } catch (err) {
+      const code = (err as Error).message;
+      return code === 'wrong_password' || code === 'weak_password' ? code : 'error';
+    }
+  };
+
   const clientClaimBooking = async (bookingId: string): Promise<'ok' | 'not_found' | 'error'> => {
     try {
       const { bookings: list } = await claimBooking(bookingId);
@@ -1045,6 +1062,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clientLogin,
         clientRegister,
         clientClaimBooking,
+        clientChangePassword,
         clientLogout,
         refreshClientBookings,
         isAdminAuthed,
