@@ -1,0 +1,8 @@
+{
+  "name": "TONIX TINT Studio - Детейлинг, Тонировка и Обклейка Авто",
+  "description": "Премиум детейлинг-центр в Бишкеке: профессиональная тонировка по ГОСТу КР, оклейка антигравийной бронепленкой (PPF), стайлинг винилом, онлайн-запись и личный кабинет.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
