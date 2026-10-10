@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { ServicesSection } from './components/ServicesSection';
@@ -15,9 +15,11 @@ import { Footer } from './components/Footer';
 import { BookingModal } from './components/BookingModal';
 import { UserCabinetModal } from './components/UserCabinetModal';
 import { AdminDashboardModal } from './components/AdminDashboardModal';
+import { AdminLoginModal } from './components/AdminLoginModal';
 import { LiveChatWidget } from './components/LiveChatWidget';
 
 function MainLayout() {
+  const { isAdminAuthed } = useApp();
   return (
     <div className="min-h-screen flex flex-col bg-[#131d33] text-slate-100 transition-colors relative selection:bg-amber-500 selection:text-slate-950">
       {/* Subtle ambient lighting for a lighter, premium aesthetic */}
@@ -42,7 +44,7 @@ function MainLayout() {
       {/* Global Interactive Modals & Floating Tools */}
       <BookingModal />
       <UserCabinetModal />
-      <AdminDashboardModal />
+      {isAdminAuthed ? <AdminDashboardModal /> : <AdminLoginModal />}
       <LiveChatWidget />
     </div>
   );

@@ -2,6 +2,23 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Language, ThemeMode, Booking, Review, ServiceItem, Master, Promotion, SecurityLog, CarCategory, HeroSlide, GalleryItem, InstagramPost } from '../types';
 import { translations, Translations } from '../data/translations';
 import { INITIAL_SERVICES, INITIAL_MASTERS, INITIAL_PROMOTIONS, INITIAL_REVIEWS, INITIAL_BOOKINGS, INITIAL_HERO_SLIDES, GALLERY_ITEMS, INITIAL_INSTAGRAM_POSTS } from '../data/initialData';
+import {
+  adminLogin,
+  adminLogout,
+  createBooking,
+  createReview,
+  deletePublicReview,
+  fetchBookings,
+  fetchContent,
+  fetchPublicReviews,
+  getAdminToken,
+  patchBookingStatus,
+  saveContent,
+  type LoginResult,
+} from '../utils/api';
+
+// Local `vite dev` has no /api functions, so the admin panel opens without a password there.
+const DEV_MODE = import.meta.env.DEV;
 
 export type AdminTab = 
   | 'orders' 
@@ -137,6 +154,11 @@ interface AppContextType {
 
   // Telegram simulation log
   telegramLogs: Array<{ id: string; time: string; text: string; bookingId: string }>;
+
+  // Admin authentication (password checked on the server)
+  isAdminAuthed: boolean;
+  loginAdmin: (password: string) => Promise<LoginResult>;
+  logoutAdmin: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -226,6 +248,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_BOOKINGS;
   });
 
+  // Reviews submitted by visitors (stored on the server separately from the curated list)
+  const [publicReviews, setPublicReviews] = useState<Review[]>([]);
+
+  const [isAdminAuthed, setIsAdminAuthed] = useState<boolean>(() => DEV_MODE || Boolean(getAdminToken()));
+
   const [activePromoCode, setActivePromoCode] = useState<string | null>(null);
 
   // Hero Slides CMS
@@ -313,26 +340,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsSyncingInstagram(true);
     setInstagramSyncStatus('syncing');
     try {
-      // Real network call attempt to public Instagram endpoint with graceful fallback
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
-        await fetch('https://www.instagram.com/tonix.kg/?__a=1&__d=dis', {
-          mode: 'no-cors',
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-      } catch {
-        // Fallback gracefully without breaking
-      }
-
-      await new Promise(r => setTimeout(r, 600));
+      // Instagram blocks direct browser requests (it returned HTTP 400 and a console error),
+      // so the feed shows the posts curated in the admin panel / built-in data.
+      await new Promise(r => setTimeout(r, 400));
 
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       setLastInstagramSyncTime(timeStr);
       setInstagramSyncStatus('synced');
-      addNotification('Instagram @tonix.kg синхронизирован', 'Свежие посты и публикации успешно подтянуты из профиля tonix.kg', 'success');
     } catch {
       setInstagramSyncStatus('error');
     } finally {
@@ -429,6 +444,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNotifications([]);
   };
 
+  // Save a piece of site content: locally for this browser, and on the server when the admin is signed in.
+  const persistContent = (contentKey: string, lsKey: string, value: unknown) => {
+    try {
+      localStorage.setItem(lsKey, typeof value === 'string' ? value : JSON.stringify(value));
+    } catch {
+      /* storage full or unavailable */
+    }
+    if (!getAdminToken()) return;
+    saveContent({ [contentKey]: value }).catch((err: { status?: number }) => {
+      if (err.status === 401) {
+        adminLogout();
+        setIsAdminAuthed(DEV_MODE);
+        addNotification('Сессия истекла', 'Войдите в админ-панель снова, чтобы сохранять изменения на сайте.', 'alert');
+      } else {
+        addNotification('Не сохранено на сервере', 'Изменение сохранено только в этом браузере. Проверьте подключение к базе данных.', 'alert');
+      }
+    });
+  };
+
+  // Load content published from the admin panel, plus visitor reviews.
+  useEffect(() => {
+    let cancelled = false;
+    fetchContent()
+      .then(({ content }) => {
+        if (cancelled || !content) return;
+        const c = content as Record<string, any>;
+        if (Array.isArray(c.services)) setServices(c.services);
+        if (Array.isArray(c.masters)) setMasters(c.masters);
+        if (c.settings && typeof c.settings === 'object') setStudioSettings({ ...DEFAULT_SETTINGS, ...c.settings });
+        if (Array.isArray(c.promotions)) setPromotions(c.promotions);
+        if (typeof c.announcement === 'string') setAnnouncementTextState(c.announcement);
+        if (Array.isArray(c.reviews)) setReviews(c.reviews);
+        if (Array.isArray(c.heroSlides) && c.heroSlides.length > 0) setHeroSlides(c.heroSlides);
+        if (Array.isArray(c.portfolio)) setPortfolioItems(c.portfolio);
+      })
+      .catch(() => {
+        /* no API (local dev) or storage not configured: keep built-in/local data */
+      });
+    fetchPublicReviews()
+      .then(({ reviews: list }) => {
+        if (!cancelled && Array.isArray(list)) setPublicReviews(list);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // When the admin is signed in, show the real bookings stored on the server.
+  useEffect(() => {
+    if (!isAdminAuthed || !isAdminOpen || !getAdminToken()) return;
+    fetchBookings()
+      .then(({ bookings: list }) => {
+        if (Array.isArray(list)) setBookings(list);
+      })
+      .catch((err: { status?: number }) => {
+        if (err.status === 401) {
+          adminLogout();
+          setIsAdminAuthed(DEV_MODE);
+        }
+      });
+  }, [isAdminAuthed, isAdminOpen]);
+
+  const loginAdmin = async (password: string): Promise<LoginResult> => {
+    const result = await adminLogin(password);
+    if (result === 'ok') setIsAdminAuthed(true);
+    return result;
+  };
+
+  const logoutAdmin = () => {
+    adminLogout();
+    setIsAdminAuthed(DEV_MODE);
+    setIsAdminOpen(false);
+    if (window.location.hash === '#admin') {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  };
+
   const addSecurityLog = (event: string, status: 'success' | 'warning' | 'alert') => {
     const newLog: SecurityLog = {
       id: `sec-${Date.now()}`,
@@ -449,7 +542,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return s;
     });
     setServices(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.SERVICES, JSON.stringify(updated));
+    persistContent('services', LOCAL_STORAGE_KEYS.SERVICES, updated);
     addNotification('Цены обновлены', 'Новые цены успешно сохранены и отображаются в калькуляторе.', 'success');
   };
 
@@ -460,14 +553,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const updated = [created, ...services];
     setServices(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.SERVICES, JSON.stringify(updated));
+    persistContent('services', LOCAL_STORAGE_KEYS.SERVICES, updated);
     addNotification('Услуга добавлена', `Услуга «${created.titleKey}» добавлена в прайс-лист.`, 'success');
   };
 
   const deleteService = (serviceId: string) => {
     const updated = services.filter(s => s.id !== serviceId);
     setServices(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.SERVICES, JSON.stringify(updated));
+    persistContent('services', LOCAL_STORAGE_KEYS.SERVICES, updated);
     addNotification('Услуга удалена', 'Услуга удалена из каталога.', 'info');
   };
 
@@ -479,7 +572,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const updated = [...masters, created];
     setMasters(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.MASTERS, JSON.stringify(updated));
+    persistContent('masters', LOCAL_STORAGE_KEYS.MASTERS, updated);
     addNotification('Мастер добавлен', `${created.name} добавлен в команду студии.`, 'success');
   };
 
@@ -491,14 +584,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return m;
     });
     setMasters(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.MASTERS, JSON.stringify(updated));
+    persistContent('masters', LOCAL_STORAGE_KEYS.MASTERS, updated);
     addNotification('Данные мастера обновлены', 'Изменения сохранены.', 'success');
   };
 
   const deleteMaster = (id: string) => {
     const updated = masters.filter(m => m.id !== id);
     setMasters(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.MASTERS, JSON.stringify(updated));
+    persistContent('masters', LOCAL_STORAGE_KEYS.MASTERS, updated);
     addNotification('Мастер удален', 'Специалист удален из списка.', 'info');
   };
 
@@ -506,7 +599,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateStudioSettings = (newSettings: Partial<StudioSettings>) => {
     const updated = { ...studioSettings, ...newSettings };
     setStudioSettings(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
+    persistContent('settings', LOCAL_STORAGE_KEYS.SETTINGS, updated);
     addNotification('Настройки студии сохранены', 'График работы и контакты обновлены.', 'success');
   };
 
@@ -518,7 +611,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const updated = [created, ...promotions];
     setPromotions(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.PROMOTIONS, JSON.stringify(updated));
+    persistContent('promotions', LOCAL_STORAGE_KEYS.PROMOTIONS, updated);
     addNotification('Акция объявлена!', `Акция «${created.title}» опубликована на сайте.`, 'success');
   };
 
@@ -530,36 +623,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return p;
     });
     setPromotions(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.PROMOTIONS, JSON.stringify(updated));
+    persistContent('promotions', LOCAL_STORAGE_KEYS.PROMOTIONS, updated);
     addNotification('Акция обновлена', 'Изменения сохранены.', 'success');
   };
 
   const deletePromotion = (id: string) => {
     const updated = promotions.filter(p => p.id !== id);
     setPromotions(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.PROMOTIONS, JSON.stringify(updated));
+    persistContent('promotions', LOCAL_STORAGE_KEYS.PROMOTIONS, updated);
     addNotification('Акция удалена', 'Акция снята с публикации.', 'info');
   };
 
   const updateAnnouncementText = (text: string) => {
     setAnnouncementTextState(text);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.ANNOUNCEMENT, text);
+    persistContent('announcement', LOCAL_STORAGE_KEYS.ANNOUNCEMENT, text);
     addNotification('Баннер обновлен', 'Текст бегущей строки в шапке сайта изменен.', 'success');
   };
 
   // Bookings
   const addBooking = (bookingData: Omit<Booking, 'id' | 'createdAt' | 'telegramSent'>): Booking => {
-    const newId = `BK-${Math.floor(10000 + Math.random() * 90000)}`;
+    const newId = `BK-${Date.now().toString(36).toUpperCase()}${Math.floor(10 + Math.random() * 90)}`;
     const newBooking: Booking = {
       ...bookingData,
       id: newId,
       createdAt: new Date().toISOString(),
-      telegramSent: true
+      telegramSent: false
     };
 
     const updated = [newBooking, ...bookings];
     setBookings(updated);
     localStorage.setItem(LOCAL_STORAGE_KEYS.BOOKINGS, JSON.stringify(updated));
+
+    // Send the booking to the studio (server stores it and notifies Telegram).
+    createBooking({ ...bookingData, id: newId })
+      .then(({ booking }) => {
+        setBookings(prev => {
+          const next = prev.map(b => (b.id === newId ? { ...b, telegramSent: booking.telegramSent } : b));
+          try { localStorage.setItem(LOCAL_STORAGE_KEYS.BOOKINGS, JSON.stringify(next)); } catch { /* ignore */ }
+          return next;
+        });
+      })
+      .catch(() => {
+        if (!DEV_MODE) {
+          addNotification(
+            'Запись не отправлена',
+            `Не удалось передать заявку в студию. Позвоните нам: ${studioSettings.phone}`,
+            'alert'
+          );
+        }
+      });
 
     // Telegram Bot notification simulation
     const tgMsg = `🔔 Новая запись ${newId} в TONIX TINT STUDIO!\n🚗 Авто: ${newBooking.carBrand} ${newBooking.carModel} (${newBooking.carYear})\n🛠 Услуга: ${newBooking.serviceTitle}\n👨‍🔧 Мастер: ${newBooking.masterName}\n📅 Дата: ${newBooking.bookingDate} в ${newBooking.bookingTime}\n💰 Сумма: ${newBooking.priceKgs.toLocaleString()} KGS\n👤 Клиент: ${newBooking.clientName} (${newBooking.clientPhone})\n💳 Оплата: ${newBooking.paymentMethod.toUpperCase()}`;
@@ -584,6 +696,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = bookings.map(b => (b.id === id ? { ...b, status } : b));
     setBookings(updated);
     localStorage.setItem(LOCAL_STORAGE_KEYS.BOOKINGS, JSON.stringify(updated));
+    if (getAdminToken()) {
+      patchBookingStatus(id, status).catch(() =>
+        addNotification('Статус не сохранен на сервере', `Повторите изменение статуса заказа #${id}.`, 'alert')
+      );
+    }
 
     addNotification('Статус заказа изменен', `Заказ #${id} переведен в статус: ${status}`, 'info');
   };
@@ -597,16 +714,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       verified: true
     };
 
-    const updated = [newRev, ...reviews];
-    setReviews(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.REVIEWS, JSON.stringify(updated));
-    addNotification('Отзыв опубликован', 'Спасибо за высокую оценку нашей работы!', 'success');
+    // Admin adds to the curated list; visitors' reviews go to the server's public list.
+    if (getAdminToken() || DEV_MODE) {
+      const updated = [newRev, ...reviews];
+      setReviews(updated);
+      persistContent('reviews', LOCAL_STORAGE_KEYS.REVIEWS, updated);
+      addNotification('Отзыв опубликован', 'Спасибо за высокую оценку нашей работы!', 'success');
+      return;
+    }
+
+    setPublicReviews(prev => [newRev, ...prev]);
+    createReview(reviewData)
+      .then(({ review }) => {
+        setPublicReviews(prev => prev.map(r => (r.id === newRev.id ? review : r)));
+        addNotification('Отзыв опубликован', 'Спасибо за отзыв о нашей работе!', 'success');
+      })
+      .catch(() => {
+        setPublicReviews(prev => prev.filter(r => r.id !== newRev.id));
+        addNotification('Отзыв не отправлен', 'Не удалось сохранить отзыв. Попробуйте позже.', 'alert');
+      });
   };
 
   const deleteReview = (id: string) => {
-    const updated = reviews.filter(r => r.id !== id);
-    setReviews(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.REVIEWS, JSON.stringify(updated));
+    if (publicReviews.some(r => r.id === id)) {
+      setPublicReviews(prev => prev.filter(r => r.id !== id));
+      if (getAdminToken()) {
+        deletePublicReview(id).catch(() =>
+          addNotification('Отзыв не удален на сервере', 'Повторите попытку.', 'alert')
+        );
+      }
+    } else {
+      const updated = reviews.filter(r => r.id !== id);
+      setReviews(updated);
+      persistContent('reviews', LOCAL_STORAGE_KEYS.REVIEWS, updated);
+    }
     addNotification('Отзыв удален', 'Отзыв снят с публикации.', 'info');
   };
 
@@ -618,14 +759,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const updated = [...heroSlides, newSlide];
     setHeroSlides(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.HERO_SLIDES, JSON.stringify(updated));
+    persistContent('heroSlides', LOCAL_STORAGE_KEYS.HERO_SLIDES, updated);
     addNotification('Слайд добавлен', `Слайд «${newSlide.carTitle}» добавлен в главный баннер.`, 'success');
   };
 
   const updateHeroSlide = (id: string, updatedFields: Partial<HeroSlide>) => {
     const updated = heroSlides.map(s => s.id === id ? { ...s, ...updatedFields } : s);
     setHeroSlides(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.HERO_SLIDES, JSON.stringify(updated));
+    persistContent('heroSlides', LOCAL_STORAGE_KEYS.HERO_SLIDES, updated);
     addNotification('Слайд обновлен', 'Настройки слайда сохранены.', 'success');
   };
 
@@ -636,7 +777,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const updated = heroSlides.filter(s => s.id !== id);
     setHeroSlides(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.HERO_SLIDES, JSON.stringify(updated));
+    persistContent('heroSlides', LOCAL_STORAGE_KEYS.HERO_SLIDES, updated);
     addNotification('Слайд удален', 'Слайд убран из слайд-шоу.', 'info');
   };
 
@@ -648,21 +789,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const updated = [newItem, ...portfolioItems];
     setPortfolioItems(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.PORTFOLIO, JSON.stringify(updated));
+    persistContent('portfolio', LOCAL_STORAGE_KEYS.PORTFOLIO, updated);
     addNotification('Работа добавлена', `Автомобиль «${newItem.car}» добавлен в портфолио.`, 'success');
   };
 
   const updatePortfolioItem = (id: string, updatedFields: Partial<GalleryItem>) => {
     const updated = portfolioItems.map(p => p.id === id ? { ...p, ...updatedFields } : p);
     setPortfolioItems(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.PORTFOLIO, JSON.stringify(updated));
+    persistContent('portfolio', LOCAL_STORAGE_KEYS.PORTFOLIO, updated);
     addNotification('Работа обновлена', 'Изменения в галерее сохранены.', 'success');
   };
 
   const deletePortfolioItem = (id: string) => {
     const updated = portfolioItems.filter(p => p.id !== id);
     setPortfolioItems(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.PORTFOLIO, JSON.stringify(updated));
+    persistContent('portfolio', LOCAL_STORAGE_KEYS.PORTFOLIO, updated);
     addNotification('Работа удалена', 'Проект удален из портфолио.', 'info');
   };
 
@@ -700,7 +841,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteMaster,
         studioSettings,
         updateStudioSettings,
-        reviews,
+        reviews: [...publicReviews.filter(p => !reviews.some(r => r.id === p.id)), ...reviews],
         addReview,
         deleteReview,
         promotions,
@@ -752,7 +893,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         likeInstagramPost,
         isSyncingInstagram,
         lastInstagramSyncTime,
-        instagramSyncStatus
+        instagramSyncStatus,
+        isAdminAuthed,
+        loginAdmin,
+        logoutAdmin
       }}
     >
       {children}

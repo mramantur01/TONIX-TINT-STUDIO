@@ -4,6 +4,7 @@ import { Booking, Master, ServiceItem, HeroSlide, GalleryItem, Review } from '..
 import { compressImageFile } from '../utils/imageUtils';
 import { 
   X, 
+  LogOut,
   Sliders, 
   TrendingUp, 
   Clock, 
@@ -123,6 +124,7 @@ export const AdminDashboardModal: React.FC = () => {
   const { 
     isAdminOpen, 
     setIsAdminOpen, 
+    logoutAdmin,
     adminActiveTab,
     setAdminActiveTab,
     bookings, 
@@ -829,6 +831,15 @@ export const AdminDashboardModal: React.FC = () => {
             >
               <Archive className="w-3.5 h-3.5 text-cyan-400" />
               <span className="hidden sm:inline">Бэкап</span>
+            </button>
+
+            <button
+              onClick={logoutAdmin}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-red-900/60 text-xs font-bold text-slate-200 cursor-pointer"
+              title="Выйти из админ-панели"
+            >
+              <LogOut className="w-3.5 h-3.5 text-red-400" />
+              <span className="hidden sm:inline">Выйти</span>
             </button>
 
             <button
