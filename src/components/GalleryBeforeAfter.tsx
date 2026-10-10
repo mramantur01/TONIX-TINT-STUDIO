@@ -174,7 +174,7 @@ export const GalleryBeforeAfter: React.FC = () => {
                     alt={item.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+                  <div className="photo-overlay absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
                   
                   <div className="absolute top-3 right-3 p-2 rounded-full bg-slate-950/70 text-slate-300 group-hover:text-amber-400 transition-colors">
                     <Maximize2 className="w-4 h-4" />

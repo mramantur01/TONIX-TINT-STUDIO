@@ -202,3 +202,20 @@ html:not(.dark) ::selection {
   background: #f59e0b;
   color: #ffffff;
 }
+
+/* Overlays on top of photos keep their original dark colours in both themes,
+   so pictures stay crisp instead of getting a white haze in light mode. */
+html:not(.dark) .photo-overlay {
+  --color-slate-950: #020617;
+  --color-slate-900: #0f172a;
+  --color-slate-800: #1e293b;
+  --color-slate-700: #334155;
+  --color-slate-400: #94a3b8;
+  --color-slate-300: #cbd5e1;
+  --color-slate-200: #e2e8f0;
+  --color-slate-100: #f1f5f9;
+}
+html:not(.dark) .photo-overlay .text-white,
+html:not(.dark) .photo-overlay.text-white {
+  color: #ffffff;
+}

@@ -339,7 +339,7 @@ export const InstagramFeed: React.FC = () => {
                 </div>
 
                 {/* Hover Overlay with Instagram Interaction */}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+                <div className="photo-overlay absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
                   
                   <div className="flex items-center justify-between text-white mb-2">
                     <div className="flex items-center gap-3">
@@ -464,7 +464,7 @@ export const InstagramFeed: React.FC = () => {
                 className="w-full h-full object-contain max-h-[75vh]"
               />
               {selectedPost.type === 'video' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
+                <div className="photo-overlay absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
                   <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/40 shadow-xl">
                     <Play className="w-8 h-8 fill-white translate-x-0.5" />
                   </div>
@@ -616,7 +616,7 @@ export const InstagramFeed: React.FC = () => {
                 alt={activeStory.title} 
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/40" />
+              <div className="photo-overlay absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/40" />
               
               <div className="absolute bottom-6 left-4 right-4 text-white space-y-3">
                 <div className="bg-slate-950/80 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">

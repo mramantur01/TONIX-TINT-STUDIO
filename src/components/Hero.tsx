@@ -147,8 +147,8 @@ export const Hero: React.FC = () => {
         ))}
 
         {/* Lightweight translucent overlays - preserves full brightness and clarity of the car */}
-        <div className="absolute inset-0 bg-slate-900/20 pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/75 via-transparent to-slate-900/30 pointer-events-none" />
+        <div className="photo-overlay absolute inset-0 bg-slate-900/20 pointer-events-none" />
+        <div className="photo-overlay absolute inset-0 bg-gradient-to-t from-slate-900/75 via-transparent to-slate-900/30 pointer-events-none" />
       </div>
 
       {/* 2. Main Content Container */}
