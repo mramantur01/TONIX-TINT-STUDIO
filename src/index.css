@@ -69,3 +69,136 @@
     color: #000000 !important;
   }
 }
+
+
+/* ==========================================================================
+   LIGHT THEME (day mode). The site is designed dark; in light mode the dark
+   slate palette is remapped to light surfaces with dark text, and accent
+   colours get darker shades so they stay readable on white.
+   Dark mode (html.dark) is untouched.
+   ========================================================================== */
+html:not(.dark) {
+  color-scheme: light;
+  /* surfaces: 950 = inner wells, 900 = cards/panels, 800/700 = borders */
+  --color-slate-950: #f1f4f9;
+  --color-slate-900: #ffffff;
+  --color-slate-800: #e3e8f0;
+  --color-slate-700: #cfd7e3;
+  --color-slate-600: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-400: #4b5a70;
+  --color-slate-300: #334155;
+  --color-slate-200: #1e293b;
+  --color-slate-100: #0f172a;
+  --color-slate-50: #020617;
+  /* accents readable on white */
+  --color-amber-300: var(--color-amber-700);
+  --color-amber-400: var(--color-amber-600);
+  --color-amber-900: var(--color-amber-100);
+  --color-amber-950: var(--color-amber-50);
+  --color-yellow-300: var(--color-yellow-700);
+  --color-yellow-400: var(--color-yellow-600);
+  --color-yellow-900: var(--color-yellow-100);
+  --color-yellow-950: var(--color-yellow-50);
+  --color-orange-300: var(--color-orange-700);
+  --color-orange-400: var(--color-orange-600);
+  --color-orange-900: var(--color-orange-100);
+  --color-orange-950: var(--color-orange-50);
+  --color-emerald-300: var(--color-emerald-700);
+  --color-emerald-400: var(--color-emerald-600);
+  --color-emerald-900: var(--color-emerald-100);
+  --color-emerald-950: var(--color-emerald-50);
+  --color-green-300: var(--color-green-700);
+  --color-green-400: var(--color-green-600);
+  --color-green-900: var(--color-green-100);
+  --color-green-950: var(--color-green-50);
+  --color-teal-300: var(--color-teal-700);
+  --color-teal-400: var(--color-teal-600);
+  --color-teal-900: var(--color-teal-100);
+  --color-teal-950: var(--color-teal-50);
+  --color-cyan-300: var(--color-cyan-700);
+  --color-cyan-400: var(--color-cyan-600);
+  --color-cyan-900: var(--color-cyan-100);
+  --color-cyan-950: var(--color-cyan-50);
+  --color-sky-300: var(--color-sky-700);
+  --color-sky-400: var(--color-sky-600);
+  --color-sky-900: var(--color-sky-100);
+  --color-sky-950: var(--color-sky-50);
+  --color-blue-300: var(--color-blue-700);
+  --color-blue-400: var(--color-blue-600);
+  --color-blue-900: var(--color-blue-100);
+  --color-blue-950: var(--color-blue-50);
+  --color-indigo-300: var(--color-indigo-700);
+  --color-indigo-400: var(--color-indigo-600);
+  --color-indigo-900: var(--color-indigo-100);
+  --color-indigo-950: var(--color-indigo-50);
+  --color-violet-300: var(--color-violet-700);
+  --color-violet-400: var(--color-violet-600);
+  --color-violet-900: var(--color-violet-100);
+  --color-violet-950: var(--color-violet-50);
+  --color-purple-300: var(--color-purple-700);
+  --color-purple-400: var(--color-purple-600);
+  --color-purple-900: var(--color-purple-100);
+  --color-purple-950: var(--color-purple-50);
+  --color-fuchsia-300: var(--color-fuchsia-700);
+  --color-fuchsia-400: var(--color-fuchsia-600);
+  --color-fuchsia-900: var(--color-fuchsia-100);
+  --color-fuchsia-950: var(--color-fuchsia-50);
+  --color-pink-300: var(--color-pink-700);
+  --color-pink-400: var(--color-pink-600);
+  --color-pink-900: var(--color-pink-100);
+  --color-pink-950: var(--color-pink-50);
+  --color-rose-300: var(--color-rose-700);
+  --color-rose-400: var(--color-rose-600);
+  --color-rose-900: var(--color-rose-100);
+  --color-rose-950: var(--color-rose-50);
+  --color-red-300: var(--color-red-700);
+  --color-red-400: var(--color-red-600);
+  --color-red-900: var(--color-red-100);
+  --color-red-950: var(--color-red-50);
+  --color-lime-300: var(--color-lime-700);
+  --color-lime-400: var(--color-lime-600);
+  --color-lime-900: var(--color-lime-100);
+  --color-lime-950: var(--color-lime-50);
+}
+
+html:not(.dark) body,
+html:not(.dark) .bg-\[\#131d33\] {
+  background-color: #f5f7fb;
+  color: #0f172a;
+}
+
+/* main headings and text that were white on dark */
+html:not(.dark) .text-white {
+  color: #0f172a;
+}
+/* keep white text on coloured / gradient buttons and badges */
+html:not(.dark) .text-white:is(
+  [class*="bg-gradient"], [class*="bg-emerald-5"], [class*="bg-emerald-6"], [class*="bg-red-5"], [class*="bg-red-6"],
+  [class*="bg-blue-5"], [class*="bg-blue-6"], [class*="bg-indigo-5"], [class*="bg-indigo-6"], [class*="bg-pink-5"],
+  [class*="bg-pink-6"], [class*="bg-rose-5"], [class*="bg-rose-6"], [class*="bg-purple-5"], [class*="bg-purple-6"],
+  [class*="bg-green-5"], [class*="bg-green-6"], [class*="bg-cyan-5"], [class*="bg-cyan-6"], [class*="bg-sky-5"], [class*="bg-sky-6"]
+) {
+  color: #ffffff;
+}
+/* dark text on amber buttons stays dark */
+html:not(.dark) .text-slate-950 {
+  color: #0f172a;
+}
+
+/* softer elevation for white cards */
+html:not(.dark) .bg-slate-900,
+html:not(.dark) .bg-slate-950 {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+html:not(.dark) .glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+html:not(.dark) ::-webkit-scrollbar-track {
+  background: #eef1f6;
+}
+html:not(.dark) ::selection {
+  background: #f59e0b;
+  color: #ffffff;
+}

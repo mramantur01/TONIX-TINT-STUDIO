@@ -407,12 +407,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Sync theme
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.THEME, theme);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#131d33' : '#f5f7fb');
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
       document.body.className = 'bg-[#131d33] text-slate-100 antialiased selection:bg-amber-500 selection:text-black';
     } else {
       document.documentElement.classList.remove('dark');
-      document.body.className = 'bg-slate-100 text-slate-900 antialiased selection:bg-amber-500 selection:text-white';
+      document.body.className = 'bg-[#f5f7fb] text-[#0f172a] antialiased selection:bg-amber-500 selection:text-white';
     }
   }, [theme]);
 
