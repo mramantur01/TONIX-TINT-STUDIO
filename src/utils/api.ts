@@ -84,3 +84,9 @@ export const createReview = (review: Omit<Review, 'id' | 'date' | 'likes' | 'ver
 
 export const deletePublicReview = (id: string) =>
   request<{ ok: boolean }>(`/api/reviews?id=${encodeURIComponent(id)}`, { method: 'DELETE' }, true);
+
+export const fetchMyBookings = (phone: string, bookingId: string) =>
+  request<{ bookings: Booking[] }>('/api/my-bookings', {
+    method: 'POST',
+    body: JSON.stringify({ phone, bookingId }),
+  });

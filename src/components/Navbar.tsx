@@ -28,7 +28,7 @@ export const Navbar: React.FC = () => {
     toggleTheme, 
     setIsBookingOpen, 
     setIsCabinetOpen, 
-    bookings,
+    clientBookings,
     notifications,
     pushEnabled,
     togglePush,
@@ -40,7 +40,7 @@ export const Navbar: React.FC = () => {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
 
-  const activeBookingsCount = bookings.filter(b => b.status === 'in_progress' || b.status === 'ready').length;
+  const activeBookingsCount = clientBookings.filter(b => b.status === 'in_progress' || b.status === 'ready').length;
 
   const languages: { code: Language; label: string; flag: string }[] = [
     { code: 'ru', label: 'Русский', flag: '🇷🇺' },

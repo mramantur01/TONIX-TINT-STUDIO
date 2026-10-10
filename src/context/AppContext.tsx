@@ -10,6 +10,7 @@ import {
   deletePublicReview,
   fetchBookings,
   fetchContent,
+  fetchMyBookings,
   fetchPublicReviews,
   getAdminToken,
   patchBookingStatus,
@@ -155,6 +156,15 @@ interface AppContextType {
   // Telegram simulation log
   telegramLogs: Array<{ id: string; time: string; text: string; bookingId: string }>;
 
+  // Client cabinet: sign in with phone + booking number
+  clientBookings: Booking[];
+  clientPhone: string | null;
+  isClientLoggedIn: boolean;
+  isClientLoading: boolean;
+  clientLogin: (phone: string, bookingId: string) => Promise<'ok' | 'not_found' | 'error'>;
+  clientLogout: () => void;
+  refreshClientBookings: () => Promise<void>;
+
   // Admin authentication (password checked on the server)
   isAdminAuthed: boolean;
   loginAdmin: (password: string) => Promise<LoginResult>;
@@ -177,7 +187,29 @@ const LOCAL_STORAGE_KEYS = {
   ANNOUNCEMENT: 'tonixtint_announcement',
   HERO_SLIDES: 'tonixtint_hero_slides',
   PORTFOLIO: 'tonixtint_portfolio',
-  INSTAGRAM_POSTS: 'tonixtint_instagram_posts'
+  INSTAGRAM_POSTS: 'tonixtint_instagram_posts',
+  CLIENT: 'tonixtint_client'
+};
+
+type ClientCredentials = { phone: string; bookingId: string };
+
+const readClientCredentials = (): ClientCredentials | null => {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEYS.CLIENT);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && parsed.phone && parsed.bookingId ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeClientCredentials = (creds: ClientCredentials | null) => {
+  try {
+    if (creds) localStorage.setItem(LOCAL_STORAGE_KEYS.CLIENT, JSON.stringify(creds));
+    else localStorage.removeItem(LOCAL_STORAGE_KEYS.CLIENT);
+  } catch {
+    /* storage unavailable */
+  }
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -252,6 +284,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [publicReviews, setPublicReviews] = useState<Review[]>([]);
 
   const [isAdminAuthed, setIsAdminAuthed] = useState<boolean>(() => DEV_MODE || Boolean(getAdminToken()));
+
+  // Client cabinet session (credentials remembered on this device)
+  const [clientCreds, setClientCreds] = useState<ClientCredentials | null>(() => readClientCredentials());
+  const [clientBookings, setClientBookings] = useState<Booking[]>([]);
+  const [isClientLoading, setIsClientLoading] = useState(false);
 
   const [activePromoCode, setActivePromoCode] = useState<string | null>(null);
 
@@ -513,6 +550,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return result;
   };
 
+  const clientLogin = async (phone: string, bookingId: string): Promise<'ok' | 'not_found' | 'error'> => {
+    setIsClientLoading(true);
+    try {
+      const { bookings: list } = await fetchMyBookings(phone, bookingId);
+      setClientBookings(list);
+      const creds = { phone, bookingId };
+      setClientCreds(creds);
+      writeClientCredentials(creds);
+      return 'ok';
+    } catch (err) {
+      return (err as { status?: number }).status === 404 ? 'not_found' : 'error';
+    } finally {
+      setIsClientLoading(false);
+    }
+  };
+
+  const refreshClientBookings = async () => {
+    if (!clientCreds) return;
+    const result = await clientLogin(clientCreds.phone, clientCreds.bookingId);
+    if (result === 'not_found') clientLogout();
+  };
+
+  const clientLogout = () => {
+    setClientCreds(null);
+    setClientBookings([]);
+    writeClientCredentials(null);
+  };
+
+  // Load the client's bookings when the cabinet opens (fresh statuses from the studio).
+  useEffect(() => {
+    if (isCabinetOpen && clientCreds) refreshClientBookings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCabinetOpen]);
+
   const logoutAdmin = () => {
     adminLogout();
     setIsAdminAuthed(DEV_MODE);
@@ -657,6 +728,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Send the booking to the studio (server stores it and notifies Telegram).
     createBooking({ ...bookingData, id: newId })
       .then(({ booking }) => {
+        if (!getAdminToken()) {
+          const creds = { phone: booking.clientPhone || bookingData.clientPhone, bookingId: booking.id };
+          setClientCreds(creds);
+          writeClientCredentials(creds);
+          setClientBookings(prev => [booking, ...prev.filter(b => b.id !== booking.id)]);
+        }
         setBookings(prev => {
           const next = prev.map(b => (b.id === newId ? { ...b, telegramSent: booking.telegramSent } : b));
           try { localStorage.setItem(LOCAL_STORAGE_KEYS.BOOKINGS, JSON.stringify(next)); } catch { /* ignore */ }
@@ -894,6 +971,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isSyncingInstagram,
         lastInstagramSyncTime,
         instagramSyncStatus,
+        clientBookings,
+        clientPhone: clientCreds?.phone ?? null,
+        isClientLoggedIn: Boolean(clientCreds),
+        isClientLoading,
+        clientLogin,
+        clientLogout,
+        refreshClientBookings,
         isAdminAuthed,
         loginAdmin,
         logoutAdmin

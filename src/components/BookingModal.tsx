@@ -27,6 +27,7 @@ export const BookingModal: React.FC = () => {
     t, 
     isBookingOpen, 
     setIsBookingOpen, 
+    setIsCabinetOpen,
     services, 
     masters, 
     addBooking, 
@@ -615,18 +616,25 @@ export const BookingModal: React.FC = () => {
               </p>
             </div>
 
-            {/* Telegram Bot Dispatch Box */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-left space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-200">
-                <span className="flex items-center gap-1.5 text-cyan-400">
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Telegram бот: @TonixTintStudio_bot</span>
-                </span>
-                <span className="text-emerald-400 text-[11px]">✓ Доставлено</span>
-              </div>
-              <p className="text-[11px] text-slate-400 font-mono bg-slate-900 p-2.5 rounded-xl border border-slate-800">
-                🔔 Заявка #{confirmedBooking.id} передана дежурному мастеру {confirmedBooking.masterName}. Бокс забронирован на {confirmedBooking.bookingDate} в {confirmedBooking.bookingTime}.
+            {/* Booking number: used together with the phone to sign in to the client cabinet */}
+            <div className="p-4 rounded-2xl bg-slate-950 border border-amber-500/30 text-left space-y-2">
+              <div className="text-xs font-bold text-slate-200">Ваш номер записи</div>
+              <div className="text-2xl font-black font-mono text-amber-400 tracking-wide select-all">{confirmedBooking.id}</div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Сохраните его. По номеру записи и телефону {confirmedBooking.clientPhone} можно войти в личный кабинет
+                и следить за статусом заказа с любого устройства.
               </p>
+              <button
+                onClick={() => {
+                  setIsBookingOpen(false);
+                  setStep(1);
+                  setConfirmedBooking(null);
+                  setIsCabinetOpen(true);
+                }}
+                className="text-xs font-bold text-amber-400 hover:text-amber-300 underline underline-offset-2 cursor-pointer"
+              >
+                Открыть личный кабинет
+              </button>
             </div>
 
             {/* Action buttons */}
