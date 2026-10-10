@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Download, Share, SquarePlus, X } from 'lucide-react';
+import { Download, EllipsisVertical, Share, SquarePlus, X } from 'lucide-react';
 
 // Chrome/Android fires this event when the site can be installed as an app.
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
-
-const DISMISS_KEY = 'tonixtint_install_dismissed';
-const DISMISS_DAYS = 14;
 
 const isStandalone = () =>
   window.matchMedia('(display-mode: standalone)').matches ||
@@ -17,22 +14,14 @@ const isIos = () =>
 
 const isMobile = () => /android|iphone|ipad|ipod/i.test(navigator.userAgent) || isIos();
 
-const recentlyDismissed = () => {
-  try {
-    const at = Number(localStorage.getItem(DISMISS_KEY));
-    return at > 0 && Date.now() - at < DISMISS_DAYS * 24 * 60 * 60 * 1000;
-  } catch {
-    return false;
-  }
-};
-
 export const InstallAppBanner: React.FC = () => {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
-  const [showIosHelp, setShowIosHelp] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (isStandalone() || !isMobile() || recentlyDismissed()) return;
+    // Shown on every visit from a phone browser; hidden only inside the installed app.
+    if (isStandalone() || !isMobile()) return;
 
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -41,29 +30,26 @@ export const InstallAppBanner: React.FC = () => {
     };
     window.addEventListener('beforeinstallprompt', onPrompt);
 
-    // iPhone has no install prompt: show the banner with manual instructions after a short delay.
-    let timer: number | undefined;
-    if (isIos()) timer = window.setTimeout(() => setVisible(true), 4000);
+    // iPhone has no install prompt, and Android Chrome may hold its prompt back for a while after
+    // a refusal: show the banner anyway after a short delay, with manual instructions as the fallback.
+    const timer = window.setTimeout(() => setVisible(true), 3000);
 
-    const onInstalled = () => setVisible(false);
+    const onInstalled = () => {
+      window.clearTimeout(timer);
+      setVisible(false);
+    };
     window.addEventListener('appinstalled', onInstalled);
     return () => {
       window.removeEventListener('beforeinstallprompt', onPrompt);
       window.removeEventListener('appinstalled', onInstalled);
-      if (timer) window.clearTimeout(timer);
+      window.clearTimeout(timer);
     };
   }, []);
 
   if (!visible) return null;
 
-  const dismiss = () => {
-    setVisible(false);
-    try {
-      localStorage.setItem(DISMISS_KEY, String(Date.now()));
-    } catch {
-      /* ignore */
-    }
-  };
+  // Closing hides the banner until the next visit.
+  const dismiss = () => setVisible(false);
 
   const install = async () => {
     if (installEvent) {
@@ -72,7 +58,7 @@ export const InstallAppBanner: React.FC = () => {
       setInstallEvent(null);
       setVisible(false);
     } else {
-      setShowIosHelp(true);
+      setShowHelp(true);
     }
   };
 
@@ -87,7 +73,7 @@ export const InstallAppBanner: React.FC = () => {
           <X className="w-4 h-4" />
         </button>
 
-        {!showIosHelp ? (
+        {!showHelp ? (
           <div className="flex items-center gap-3 pr-6">
             <img src="/icons/icon-192.png" alt="" className="w-12 h-12 rounded-xl shrink-0" />
             <div className="flex-1 min-w-0">
@@ -105,23 +91,43 @@ export const InstallAppBanner: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="space-y-2 pr-6">
-            <div className="text-sm font-extrabold text-white">Как установить на iPhone</div>
-            <ol className="space-y-1.5 text-xs text-slate-300">
-              <li className="flex items-center gap-2">
-                <span className="text-amber-400 font-black">1.</span>
-                Нажмите <Share className="w-4 h-4 text-sky-400 inline" /> «Поделиться» внизу экрана Safari
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-amber-400 font-black">2.</span>
-                Выберите <SquarePlus className="w-4 h-4 text-slate-200 inline" /> «На экран „Домой“»
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-amber-400 font-black">3.</span>
-                Нажмите «Добавить» — иконка TONIX появится на экране
-              </li>
-            </ol>
-          </div>
+          isIos() ? (
+            <div className="space-y-2 pr-6">
+              <div className="text-sm font-extrabold text-white">Как установить на iPhone</div>
+              <ol className="space-y-1.5 text-xs text-slate-300">
+                <li className="flex items-center gap-2">
+                  <span className="text-amber-400 font-black">1.</span>
+                  Нажмите <Share className="w-4 h-4 text-sky-400 inline" /> «Поделиться» внизу экрана Safari
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-amber-400 font-black">2.</span>
+                  Выберите <SquarePlus className="w-4 h-4 text-slate-200 inline" /> «На экран „Домой“»
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-amber-400 font-black">3.</span>
+                  Нажмите «Добавить» — иконка TONIX появится на экране
+                </li>
+              </ol>
+            </div>
+          ) : (
+            <div className="space-y-2 pr-6">
+              <div className="text-sm font-extrabold text-white">Как установить на Android</div>
+              <ol className="space-y-1.5 text-xs text-slate-300">
+                <li className="flex items-center gap-2">
+                  <span className="text-amber-400 font-black">1.</span>
+                  Нажмите <EllipsisVertical className="w-4 h-4 text-slate-200 inline" /> меню в правом верхнем углу Chrome
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-amber-400 font-black">2.</span>
+                  Выберите «Установить приложение» или «Добавить на гл. экран»
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-amber-400 font-black">3.</span>
+                  Подтвердите — иконка TONIX появится на экране
+                </li>
+              </ol>
+            </div>
+          )
         )}
       </div>
     </div>
