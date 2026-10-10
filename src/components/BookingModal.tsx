@@ -621,8 +621,8 @@ export const BookingModal: React.FC = () => {
               <div className="text-xs font-bold text-slate-200">Ваш номер записи</div>
               <div className="text-2xl font-black font-mono text-amber-400 tracking-wide select-all">{confirmedBooking.id}</div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Сохраните его. По номеру записи и телефону {confirmedBooking.clientPhone} можно войти в личный кабинет
-                и следить за статусом заказа с любого устройства.
+                Сохраните его. Зарегистрируйтесь в личном кабинете по номеру {confirmedBooking.clientPhone}, чтобы
+                следить за статусом заказа с любого устройства — при регистрации понадобится этот номер записи.
               </p>
               <button
                 onClick={() => {

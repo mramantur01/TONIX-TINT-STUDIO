@@ -2,6 +2,31 @@
 import type { Booking, Review } from '../types';
 
 const TOKEN_KEY = 'tonixtint_admin_token';
+const CLIENT_TOKEN_KEY = 'tonixtint_client_token';
+
+export const getClientToken = (): string | null => {
+  try {
+    const token = localStorage.getItem(CLIENT_TOKEN_KEY);
+    if (!token) return null;
+    const expires = Number(token.split('.')[1]);
+    if (!expires || expires < Date.now()) {
+      localStorage.removeItem(CLIENT_TOKEN_KEY);
+      return null;
+    }
+    return token;
+  } catch {
+    return null;
+  }
+};
+
+export const setClientToken = (token: string | null) => {
+  try {
+    if (token) localStorage.setItem(CLIENT_TOKEN_KEY, token);
+    else localStorage.removeItem(CLIENT_TOKEN_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+};
 
 export const getAdminToken = (): string | null => {
   try {
@@ -33,6 +58,8 @@ async function request<T>(path: string, options: RequestInit = {}, admin = false
     const token = getAdminToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
+  const clientToken = getClientToken();
+  if (clientToken) headers['X-Client-Token'] = clientToken;
   const res = await fetch(path, { ...options, headers: { ...headers, ...(options.headers as Record<string, string>) } });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -85,8 +112,16 @@ export const createReview = (review: Omit<Review, 'id' | 'date' | 'likes' | 'ver
 export const deletePublicReview = (id: string) =>
   request<{ ok: boolean }>(`/api/reviews?id=${encodeURIComponent(id)}`, { method: 'DELETE' }, true);
 
-export const fetchMyBookings = (phone: string, bookingId: string) =>
-  request<{ bookings: Booking[] }>('/api/my-bookings', {
-    method: 'POST',
-    body: JSON.stringify({ phone, bookingId }),
-  });
+export type ClientProfile = { name: string; phone: string; createdAt: string };
+type AccountResponse = { token?: string; profile: ClientProfile; bookings: Booking[] };
+
+export const fetchAccount = () => request<AccountResponse>('/api/account');
+
+export const registerAccount = (data: { name: string; phone: string; password: string; bookingId?: string }) =>
+  request<AccountResponse>('/api/account', { method: 'POST', body: JSON.stringify({ action: 'register', ...data }) });
+
+export const loginAccount = (phone: string, password: string) =>
+  request<AccountResponse>('/api/account', { method: 'POST', body: JSON.stringify({ action: 'login', phone, password }) });
+
+export const claimBooking = (bookingId: string) =>
+  request<{ bookings: Booking[] }>('/api/account', { method: 'POST', body: JSON.stringify({ action: 'claim', bookingId }) });

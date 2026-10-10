@@ -10,7 +10,13 @@ import {
   deletePublicReview,
   fetchBookings,
   fetchContent,
-  fetchMyBookings,
+  fetchAccount,
+  registerAccount,
+  loginAccount,
+  claimBooking,
+  getClientToken,
+  setClientToken,
+  type ClientProfile,
   fetchPublicReviews,
   getAdminToken,
   patchBookingStatus,
@@ -156,12 +162,14 @@ interface AppContextType {
   // Telegram simulation log
   telegramLogs: Array<{ id: string; time: string; text: string; bookingId: string }>;
 
-  // Client cabinet: sign in with phone + booking number
+  // Client cabinet: account with phone + password
   clientBookings: Booking[];
-  clientPhone: string | null;
+  clientProfile: ClientProfile | null;
   isClientLoggedIn: boolean;
   isClientLoading: boolean;
-  clientLogin: (phone: string, bookingId: string) => Promise<'ok' | 'not_found' | 'error'>;
+  clientLogin: (phone: string, password: string) => Promise<ClientAuthResult>;
+  clientRegister: (data: { name: string; phone: string; password: string; bookingId?: string }) => Promise<ClientAuthResult>;
+  clientClaimBooking: (bookingId: string) => Promise<'ok' | 'not_found' | 'error'>;
   clientLogout: () => void;
   refreshClientBookings: () => Promise<void>;
 
@@ -187,30 +195,17 @@ const LOCAL_STORAGE_KEYS = {
   ANNOUNCEMENT: 'tonixtint_announcement',
   HERO_SLIDES: 'tonixtint_hero_slides',
   PORTFOLIO: 'tonixtint_portfolio',
-  INSTAGRAM_POSTS: 'tonixtint_instagram_posts',
-  CLIENT: 'tonixtint_client'
+  INSTAGRAM_POSTS: 'tonixtint_instagram_posts'
 };
 
-type ClientCredentials = { phone: string; bookingId: string };
-
-const readClientCredentials = (): ClientCredentials | null => {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEYS.CLIENT);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return parsed && parsed.phone && parsed.bookingId ? parsed : null;
-  } catch {
-    return null;
-  }
-};
-
-const writeClientCredentials = (creds: ClientCredentials | null) => {
-  try {
-    if (creds) localStorage.setItem(LOCAL_STORAGE_KEYS.CLIENT, JSON.stringify(creds));
-    else localStorage.removeItem(LOCAL_STORAGE_KEYS.CLIENT);
-  } catch {
-    /* storage unavailable */
-  }
-};
+export type ClientAuthResult =
+  | 'ok'
+  | 'wrong_credentials'
+  | 'already_registered'
+  | 'booking_required'
+  | 'booking_mismatch'
+  | 'weak_password'
+  | 'error';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<Language>(() => {
@@ -286,7 +281,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAdminAuthed, setIsAdminAuthed] = useState<boolean>(() => DEV_MODE || Boolean(getAdminToken()));
 
   // Client cabinet session (credentials remembered on this device)
-  const [clientCreds, setClientCreds] = useState<ClientCredentials | null>(() => readClientCredentials());
+  const [isClientLoggedIn, setIsClientLoggedIn] = useState<boolean>(() => Boolean(getClientToken()));
+  const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [clientBookings, setClientBookings] = useState<Booking[]>([]);
   const [isClientLoading, setIsClientLoading] = useState(false);
 
@@ -550,37 +546,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return result;
   };
 
-  const clientLogin = async (phone: string, bookingId: string): Promise<'ok' | 'not_found' | 'error'> => {
+  const applyAccount = (data: { token?: string; profile: ClientProfile; bookings: Booking[] }) => {
+    if (data.token) setClientToken(data.token);
+    setIsClientLoggedIn(true);
+    setClientProfile(data.profile);
+    setClientBookings(data.bookings);
+  };
+
+  const toAuthResult = (err: unknown): ClientAuthResult => {
+    const code = (err as Error).message;
+    const known: ClientAuthResult[] = ['wrong_credentials', 'already_registered', 'booking_required', 'booking_mismatch', 'weak_password'];
+    return known.includes(code as ClientAuthResult) ? (code as ClientAuthResult) : 'error';
+  };
+
+  const clientLogin = async (phone: string, password: string): Promise<ClientAuthResult> => {
     setIsClientLoading(true);
     try {
-      const { bookings: list } = await fetchMyBookings(phone, bookingId);
-      setClientBookings(list);
-      const creds = { phone, bookingId };
-      setClientCreds(creds);
-      writeClientCredentials(creds);
+      applyAccount(await loginAccount(phone, password));
       return 'ok';
     } catch (err) {
-      return (err as { status?: number }).status === 404 ? 'not_found' : 'error';
+      return toAuthResult(err);
     } finally {
       setIsClientLoading(false);
     }
   };
 
-  const refreshClientBookings = async () => {
-    if (!clientCreds) return;
-    const result = await clientLogin(clientCreds.phone, clientCreds.bookingId);
-    if (result === 'not_found') clientLogout();
+  const clientRegister = async (data: { name: string; phone: string; password: string; bookingId?: string }): Promise<ClientAuthResult> => {
+    setIsClientLoading(true);
+    try {
+      applyAccount(await registerAccount(data));
+      return 'ok';
+    } catch (err) {
+      return toAuthResult(err);
+    } finally {
+      setIsClientLoading(false);
+    }
   };
 
   const clientLogout = () => {
-    setClientCreds(null);
+    setClientToken(null);
+    setIsClientLoggedIn(false);
+    setClientProfile(null);
     setClientBookings([]);
-    writeClientCredentials(null);
   };
 
-  // Load the client's bookings when the cabinet opens (fresh statuses from the studio).
+  const refreshClientBookings = async () => {
+    if (!getClientToken()) return;
+    setIsClientLoading(true);
+    try {
+      applyAccount(await fetchAccount());
+    } catch (err) {
+      if ((err as { status?: number }).status === 401) clientLogout();
+    } finally {
+      setIsClientLoading(false);
+    }
+  };
+
+  const clientClaimBooking = async (bookingId: string): Promise<'ok' | 'not_found' | 'error'> => {
+    try {
+      const { bookings: list } = await claimBooking(bookingId);
+      setClientBookings(list);
+      return 'ok';
+    } catch (err) {
+      return (err as { status?: number }).status === 404 ? 'not_found' : 'error';
+    }
+  };
+
+  // Load the client's account when the cabinet opens (fresh statuses from the studio).
   useEffect(() => {
-    if (isCabinetOpen && clientCreds) refreshClientBookings();
+    if (isCabinetOpen && isClientLoggedIn) refreshClientBookings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCabinetOpen]);
 
@@ -728,10 +762,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Send the booking to the studio (server stores it and notifies Telegram).
     createBooking({ ...bookingData, id: newId })
       .then(({ booking }) => {
-        if (!getAdminToken()) {
-          const creds = { phone: booking.clientPhone || bookingData.clientPhone, bookingId: booking.id };
-          setClientCreds(creds);
-          writeClientCredentials(creds);
+        if (getClientToken()) {
           setClientBookings(prev => [booking, ...prev.filter(b => b.id !== booking.id)]);
         }
         setBookings(prev => {
@@ -972,10 +1003,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastInstagramSyncTime,
         instagramSyncStatus,
         clientBookings,
-        clientPhone: clientCreds?.phone ?? null,
-        isClientLoggedIn: Boolean(clientCreds),
+        clientProfile,
+        isClientLoggedIn,
         isClientLoading,
         clientLogin,
+        clientRegister,
+        clientClaimBooking,
         clientLogout,
         refreshClientBookings,
         isAdminAuthed,

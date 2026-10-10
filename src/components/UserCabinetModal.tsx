@@ -12,12 +12,19 @@ import {
   Loader2,
   KeyRound,
   CalendarPlus,
+  Plus,
 } from 'lucide-react';
 import { Booking } from '../types';
 import { TonixLogo } from './TonixLogo';
 
-const LOGIN_ERRORS: Record<string, string> = {
-  not_found: 'Запись не найдена. Проверьте номер телефона и номер записи (например, BK-MG8X3Q12).',
+const AUTH_ERRORS: Record<string, string> = {
+  wrong_credentials: 'Неверный телефон или пароль.',
+  already_registered: 'Этот номер уже зарегистрирован. Войдите с паролем.',
+  booking_required:
+    'На этот номер уже есть записи. Чтобы подтвердить, что номер ваш, укажите номер любой вашей записи (BK-…).',
+  booking_mismatch: 'Номер записи не подходит к этому телефону.',
+  weak_password: 'Пароль должен быть не короче 6 символов.',
+  password_mismatch: 'Пароли не совпадают.',
   error: 'Не удалось связаться с сервером. Попробуйте ещё раз или позвоните нам.',
 };
 
@@ -30,10 +37,12 @@ export const UserCabinetModal: React.FC = () => {
     services,
     studioSettings,
     clientBookings,
-    clientPhone,
+    clientProfile,
     isClientLoggedIn,
     isClientLoading,
     clientLogin,
+    clientRegister,
+    clientClaimBooking,
     clientLogout,
     refreshClientBookings,
     addNotification,
@@ -41,9 +50,16 @@ export const UserCabinetModal: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'orders' | 'garage'>('orders');
   const [selectedBookingForWarranty, setSelectedBookingForWarranty] = useState<Booking | null>(null);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [nameInput, setNameInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [password2Input, setPassword2Input] = useState('');
   const [bookingIdInput, setBookingIdInput] = useState('');
+  const [needBookingId, setNeedBookingId] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [claimInput, setClaimInput] = useState('');
+  const [claimMessage, setClaimMessage] = useState<string | null>(null);
 
   const sortedBookings = useMemo(
     () => [...clientBookings].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')),
@@ -73,12 +89,59 @@ export const UserCabinetModal: React.FC = () => {
 
   const warrantyYearsFor = (b: Booking) => services.find((s) => s.id === b.serviceId)?.warrantyYears;
 
-  const submitLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneInput.trim() || !bookingIdInput.trim() || isClientLoading) return;
+  const resetAuthForm = () => {
+    setPasswordInput('');
+    setPassword2Input('');
     setLoginError(null);
-    const result = await clientLogin(phoneInput.trim(), bookingIdInput.trim());
-    if (result !== 'ok') setLoginError(LOGIN_ERRORS[result]);
+  };
+
+  const submitAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isClientLoading) return;
+    setLoginError(null);
+    if (authMode === 'login') {
+      const result = await clientLogin(phoneInput.trim(), passwordInput);
+      if (result === 'ok') resetAuthForm();
+      else setLoginError(AUTH_ERRORS[result] || AUTH_ERRORS.error);
+      return;
+    }
+    if (passwordInput !== password2Input) {
+      setLoginError(AUTH_ERRORS.password_mismatch);
+      return;
+    }
+    const result = await clientRegister({
+      name: nameInput.trim(),
+      phone: phoneInput.trim(),
+      password: passwordInput,
+      bookingId: bookingIdInput.trim() || undefined,
+    });
+    if (result === 'ok') {
+      resetAuthForm();
+      setBookingIdInput('');
+      setNeedBookingId(false);
+      addNotification('Регистрация завершена', 'Теперь вы можете входить по телефону и паролю.', 'success');
+      return;
+    }
+    if (result === 'booking_required' || result === 'booking_mismatch') setNeedBookingId(true);
+    if (result === 'already_registered') setAuthMode('login');
+    setLoginError(AUTH_ERRORS[result] || AUTH_ERRORS.error);
+  };
+
+  const submitClaim = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!claimInput.trim()) return;
+    setClaimMessage(null);
+    const result = await clientClaimBooking(claimInput.trim());
+    if (result === 'ok') {
+      setClaimInput('');
+      setClaimMessage('Запись добавлена в ваш кабинет.');
+    } else {
+      setClaimMessage(
+        result === 'not_found'
+          ? 'Запись не найдена. Добавить можно только запись, оформленную на ваш номер телефона.'
+          : AUTH_ERRORS.error
+      );
+    }
   };
 
   const exportCsv = () => {
@@ -119,13 +182,17 @@ export const UserCabinetModal: React.FC = () => {
     }
   };
 
-  // ---------- Sign-in screen ----------
+  // ---------- Sign-in / registration screen ----------
   if (!isClientLoggedIn) {
+    const isRegister = authMode === 'register';
+    const canSubmit = isRegister
+      ? nameInput.trim() && phoneInput.trim() && passwordInput && password2Input && (!needBookingId || bookingIdInput.trim())
+      : phoneInput.trim() && passwordInput;
     return (
-      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
         <form
-          onSubmit={submitLogin}
-          className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 space-y-4"
+          onSubmit={submitAuth}
+          className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 space-y-4 my-auto"
         >
           <button
             type="button"
@@ -142,12 +209,43 @@ export const UserCabinetModal: React.FC = () => {
             </div>
             <div>
               <h3 className="text-base font-extrabold text-white">{t.cabinetTitle}</h3>
-              <p className="text-xs text-slate-400">Вход по телефону и номеру записи</p>
+              <p className="text-xs text-slate-400">{isRegister ? 'Регистрация по номеру телефона' : 'Вход по телефону и паролю'}</p>
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800">
+            {(['login', 'register'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => {
+                  setAuthMode(mode);
+                  setLoginError(null);
+                }}
+                className={`py-2 rounded-lg text-xs font-bold cursor-pointer ${
+                  authMode === mode ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {mode === 'login' ? 'Вход' : 'Регистрация'}
+              </button>
+            ))}
+          </div>
+
+          {isRegister && (
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-300">Имя</span>
+              <input
+                type="text"
+                autoComplete="name"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+              />
+            </label>
+          )}
+
           <label className="block">
-            <span className="text-xs font-semibold text-slate-300">Телефон, указанный при записи</span>
+            <span className="text-xs font-semibold text-slate-300">Номер телефона</span>
             <input
               type="tel"
               inputMode="tel"
@@ -160,30 +258,59 @@ export const UserCabinetModal: React.FC = () => {
           </label>
 
           <label className="block">
-            <span className="text-xs font-semibold text-slate-300">Номер записи</span>
+            <span className="text-xs font-semibold text-slate-300">Пароль{isRegister ? ' (не короче 6 символов)' : ''}</span>
             <input
-              type="text"
-              placeholder="BK-..."
-              autoCapitalize="characters"
-              value={bookingIdInput}
-              onChange={(e) => setBookingIdInput(e.target.value)}
-              className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white font-mono uppercase focus:outline-none focus:border-amber-500"
+              type="password"
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
             />
-            <span className="mt-1 block text-[11px] text-slate-500">
-              Номер показывается после записи на сайте. Если потеряли его — позвоните нам: {studioSettings.phone}
-            </span>
           </label>
+
+          {isRegister && (
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-300">Повторите пароль</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={password2Input}
+                onChange={(e) => setPassword2Input(e.target.value)}
+                className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+              />
+            </label>
+          )}
+
+          {isRegister && needBookingId && (
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-300">Номер вашей записи</span>
+              <input
+                type="text"
+                placeholder="BK-..."
+                autoCapitalize="characters"
+                value={bookingIdInput}
+                onChange={(e) => setBookingIdInput(e.target.value)}
+                className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 font-mono uppercase"
+              />
+            </label>
+          )}
 
           {loginError && <p className="text-xs text-red-400 leading-relaxed">{loginError}</p>}
 
           <button
             type="submit"
-            disabled={!phoneInput.trim() || !bookingIdInput.trim() || isClientLoading}
+            disabled={!canSubmit || isClientLoading}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-sm font-extrabold cursor-pointer disabled:cursor-not-allowed"
           >
             {isClientLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Войти
+            {isRegister ? 'Зарегистрироваться' : 'Войти'}
           </button>
+
+          {!isRegister && (
+            <p className="text-[11px] text-slate-500 text-center">
+              Забыли пароль? Позвоните нам: {studioSettings.phone}
+            </p>
+          )}
 
           <button
             type="button"
@@ -194,7 +321,7 @@ export const UserCabinetModal: React.FC = () => {
             className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
           >
             <CalendarPlus className="w-4 h-4 text-amber-400" />
-            Ещё не записывались? Записаться
+            Записаться без регистрации
           </button>
         </form>
       </div>
@@ -202,7 +329,7 @@ export const UserCabinetModal: React.FC = () => {
   }
 
   // ---------- Cabinet ----------
-  const clientName = sortedBookings[0]?.clientName || 'Клиент';
+  const clientName = clientProfile?.name || sortedBookings[0]?.clientName || 'Клиент';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
@@ -215,7 +342,7 @@ export const UserCabinetModal: React.FC = () => {
             </div>
             <div>
               <h3 className="text-base font-extrabold text-white">{clientName}</h3>
-              <p className="text-xs text-slate-400">{clientPhone}</p>
+              <p className="text-xs text-slate-400">{clientProfile?.phone}</p>
             </div>
           </div>
 
@@ -289,6 +416,30 @@ export const UserCabinetModal: React.FC = () => {
             {sortedBookings.length === 0 && (
               <p className="text-sm text-slate-400">{isClientLoading ? 'Загружаем ваши записи…' : 'Записей пока нет.'}</p>
             )}
+
+            <form onSubmit={submitClaim} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+              <div className="text-[11px] text-slate-400">
+                Записывались без входа? Добавьте запись по её номеру:
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="BK-..."
+                  value={claimInput}
+                  onChange={(e) => setClaimInput(e.target.value)}
+                  className="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  type="submit"
+                  disabled={!claimInput.trim()}
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-xs font-bold text-slate-200 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 text-amber-400" />
+                  Добавить
+                </button>
+              </div>
+              {claimMessage && <p className="text-[11px] text-slate-300">{claimMessage}</p>}
+            </form>
 
             <div className="space-y-3">
               {sortedBookings.map((b) => {

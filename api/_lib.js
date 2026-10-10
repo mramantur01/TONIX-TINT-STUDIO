@@ -129,3 +129,40 @@ export async function notifyTelegram(text) {
     return false;
   }
 }
+
+// ---- Client accounts (phone + password) -----------------------------------------------------
+
+// Compare phones by their last 9 digits, so "+996 555 12 34 56" and "0555123456" match.
+export const phoneKey = (value) => String(value ?? '').replace(/\D/g, '').slice(-9);
+
+const SESSION_SECRET =
+  process.env.SESSION_SECRET ||
+  crypto.createHash('sha256').update(`tonix-client:${REDIS_TOKEN || ''}:${ADMIN_PASSWORD}`).digest('hex');
+const CLIENT_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // clients stay signed in for 30 days
+
+export function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  return { salt, hash };
+}
+
+export function verifyPassword(password, salt, expectedHash) {
+  const { hash } = hashPassword(password, salt);
+  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(expectedHash, 'hex'));
+}
+
+const signClient = (payload) => crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+
+export function issueClientToken(phone) {
+  const payload = `${phoneKey(phone)}.${Date.now() + CLIENT_TOKEN_TTL_MS}`;
+  return `${payload}.${signClient(payload)}`;
+}
+
+// Returns the phone key of the signed-in client, or null.
+export function clientFromRequest(req) {
+  const header = req.headers['x-client-token'] || '';
+  const [key, expires, signature] = String(header).split('.');
+  if (!key || !expires || !signature || Number(expires) < Date.now()) return null;
+  const expected = signClient(`${key}.${expires}`);
+  if (signature.length !== expected.length) return null;
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected)) ? key : null;
+}

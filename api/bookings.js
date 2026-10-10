@@ -1,6 +1,7 @@
 // Client bookings.
 // POST is public (a visitor books a slot); GET and PATCH require an admin token.
 import {
+  clientFromRequest,
   clip,
   getJson,
   handleError,
@@ -67,6 +68,8 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'POST') {
       const booking = sanitize(readBody(req));
+      const clientKey = clientFromRequest(req);
+      if (clientKey) booking.userId = clientKey; // booked while signed in to the cabinet
       if (!booking.clientName || !booking.clientPhone || !booking.bookingDate || !booking.bookingTime) {
         return send(res, 400, { error: 'missing_fields' });
       }
