@@ -132,17 +132,6 @@ export const Navbar: React.FC = () => {
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
             </button>
 
-            {/* Instagram Link */}
-            <a
-              href={getInstagramUrl(studioSettings.instagram)}
-              target="_blank"
-              rel="noreferrer"
-              className="p-2 rounded-lg border border-slate-800 bg-slate-900/80 text-pink-400 hover:text-pink-300 hover:border-pink-500/40 transition-colors"
-              title={`Instagram ${getInstagramUsername(studioSettings.instagram)}`}
-            >
-              <Instagram className="w-4 h-4" />
-            </a>
-
             {/* Notification Bell */}
             <div className="relative">
               <button
