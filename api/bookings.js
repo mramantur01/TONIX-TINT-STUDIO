@@ -2,6 +2,7 @@
 // POST needs a client account (or the admin); GET ?date=YYYY-MM-DD is public and returns only
 // which master/time slots are taken that day; the full GET and PATCH require an admin token.
 import {
+  BOOKINGS_ARCHIVE_KEY,
   clientFromRequest,
   clip,
   getJson,
@@ -15,6 +16,7 @@ import {
 } from './_lib.js';
 
 const KEY = 'bookings';
+// The newest bookings stay in KEY; older ones move to the archive list, nothing is deleted.
 const MAX_BOOKINGS = 2000;
 const STATUSES = ['pending', 'in_progress', 'ready', 'completed', 'cancelled'];
 const PAYMENT_METHODS = ['mbank', 'odengi', 'optima', 'card', 'cash'];
@@ -100,7 +102,7 @@ export default async function handler(req, res) {
         return send(res, 409, { error: 'slot_taken' });
       }
       booking.telegramSent = await notifyTelegram(telegramText(booking));
-      await listPrepend(KEY, booking, MAX_BOOKINGS);
+      await listPrepend(KEY, booking, MAX_BOOKINGS, BOOKINGS_ARCHIVE_KEY);
       return send(res, 201, { booking });
     }
 

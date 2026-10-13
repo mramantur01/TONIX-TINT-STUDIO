@@ -18,7 +18,9 @@ export const CONTENT_KEYS = [
   'portfolio',
 ];
 
-export const storageConfigured = () => Boolean(REDIS_URL && REDIS_TOKEN);
+export const BOOKINGS_ARCHIVE_KEY = 'bookings:archive';
+
+export const storageConfigured =() => Boolean(REDIS_URL && REDIS_TOKEN);
 export const adminConfigured = () => ADMIN_PASSWORD.length > 0;
 
 export async function redis(command) {
@@ -58,13 +60,18 @@ export const setJson = (key, value) => redis(['SET', key, JSON.stringify(value)]
 // the same moment would silently drop one change, so these updates run inside Redis as Lua
 // scripts. If scripting fails for any reason, they fall back to a plain read-modify-write.
 
+// Items pushed out past `max` go to the archive list KEYS[2] (one JSON per element) when given,
+// so old records are kept instead of dropped.
 const PREPEND_LUA = `
 local raw = redis.call('GET', KEYS[1])
 local list = {}
 if raw then list = cjson.decode(raw) end
 table.insert(list, 1, cjson.decode(ARGV[1]))
 local max = tonumber(ARGV[2])
-while #list > max do table.remove(list) end
+while #list > max do
+  local old = table.remove(list)
+  if KEYS[2] then redis.call('RPUSH', KEYS[2], cjson.encode(old)) end
+end
 redis.call('SET', KEYS[1], cjson.encode(list))
 return #list`;
 
@@ -93,28 +100,50 @@ end
 if #kept == 0 then redis.call('SET', KEYS[1], '[]') else redis.call('SET', KEYS[1], cjson.encode(kept)) end
 return #kept`;
 
-async function runScript(script, key, args, fallback) {
+async function runScript(script, keys, args, fallback) {
   try {
-    return await redis(['EVAL', script, '1', key, ...args]);
+    return await redis(['EVAL', script, String(keys.length), ...keys, ...args]);
   } catch (err) {
     if (err.status !== 502) throw err;
     console.error('Lua script failed, using read-modify-write', err);
-    return fallback(await getJson(key, []));
+    return fallback(await getJson(keys[0], []));
   }
 }
 
-export const listPrepend = (key, item, max) =>
-  runScript(PREPEND_LUA, key, [JSON.stringify(item), String(max)], (list) =>
-    setJson(key, [item, ...list].slice(0, max))
+export const listPrepend = (key, item, max, archiveKey) =>
+  runScript(
+    PREPEND_LUA,
+    archiveKey ? [key, archiveKey] : [key],
+    [JSON.stringify(item), String(max)],
+    async (list) => {
+      const next = [item, ...list];
+      const overflow = next.slice(max);
+      if (archiveKey && overflow.length) await redis(['RPUSH', archiveKey, ...overflow.map((x) => JSON.stringify(x))]);
+      return setJson(key, next.slice(0, max));
+    }
   );
 
 export const listPatch = (key, id, fields) =>
-  runScript(PATCH_LUA, key, [String(id), JSON.stringify(fields)], (list) =>
+  runScript(PATCH_LUA, [key], [String(id), JSON.stringify(fields)], (list) =>
     setJson(key, list.map((x) => (x.id === id ? { ...x, ...fields } : x)))
   );
 
 export const listRemove = (key, id) =>
-  runScript(REMOVE_LUA, key, [String(id)], (list) => setJson(key, list.filter((x) => x.id !== id)));
+  runScript(REMOVE_LUA, [key], [String(id)], (list) => setJson(key, list.filter((x) => x.id !== id)));
+
+// Archived records (oldest first), from a list filled by listPrepend.
+export async function readArchive(archiveKey) {
+  const raw = (await redis(['LRANGE', archiveKey, '0', '-1'])) || [];
+  return raw
+    .map((s) => {
+      try {
+        return JSON.parse(s);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
 
 // ---- Admin auth: stateless HMAC-signed token -------------------------------------------
 
@@ -202,6 +231,30 @@ const SESSION_SECRET =
   process.env.SESSION_SECRET ||
   crypto.createHash('sha256').update(`tonix-client:${REDIS_TOKEN || ''}:${ADMIN_PASSWORD}`).digest('hex');
 const CLIENT_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // clients stay signed in for 30 days
+
+// Every client account (user:<phone key>), with `key` added.
+export async function allUsers() {
+  const keys = [];
+  let cursor = '0';
+  do {
+    const [next, batch] = await redis(['SCAN', cursor, 'MATCH', 'user:*', 'COUNT', '500']);
+    cursor = String(next);
+    keys.push(...batch);
+  } while (cursor !== '0');
+  const users = [];
+  for (let i = 0; i < keys.length; i += 500) {
+    const chunk = keys.slice(i, i + 500);
+    const values = await redis(['MGET', ...chunk]);
+    values.forEach((raw, j) => {
+      try {
+        users.push({ key: chunk[j].slice(5), ...JSON.parse(raw) });
+      } catch {
+        /* skip a corrupted record */
+      }
+    });
+  }
+  return users;
+}
 
 export function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { KeyRound, Loader2, MessageCircle, RefreshCw, Search, Copy, Check } from 'lucide-react';
-import { fetchClients, resetClientPassword, type AdminClient } from '../utils/api';
+import { KeyRound, Loader2, MessageCircle, RefreshCw, Search, Copy, Check, Download } from 'lucide-react';
+import { downloadBackup, fetchClients, resetClientPassword, type AdminClient } from '../utils/api';
 
 // Admin tab: client accounts and resetting a forgotten password.
 export const AdminClientsTab: React.FC = () => {
@@ -11,6 +11,17 @@ export const AdminClientsTab: React.FC = () => {
   const [resetting, setResetting] = useState<string | null>(null);
   const [issued, setIssued] = useState<{ name: string; phone: string; tempPassword: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [backupState, setBackupState] = useState<'idle' | 'loading' | string>('idle');
+
+  const backup = async () => {
+    setBackupState('loading');
+    try {
+      const { bookings, clients: count } = await downloadBackup();
+      setBackupState(`Сохранено: ${bookings} заявок, ${count} клиентов — файл в папке «Загрузки».`);
+    } catch {
+      setBackupState('Не удалось скачать копию. Попробуйте ещё раз.');
+    }
+  };
 
   const load = async (q = query) => {
     setLoading(true);
@@ -73,6 +84,28 @@ export const AdminClientsTab: React.FC = () => {
           Если клиент забыл пароль: найдите его по номеру, нажмите «Сбросить пароль» и отправьте временный пароль в WhatsApp.
           После входа клиент сам задаст новый пароль.
         </p>
+      </div>
+
+      <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-bold text-white">Резервная копия базы</div>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            Все заявки (включая архив), клиенты, отзывы и настройки сайта одним файлом. Пароли клиентов в файл не попадают.
+            Скачивайте раз в месяц и храните на компьютере или в облаке.
+          </p>
+          {backupState !== 'idle' && backupState !== 'loading' && (
+            <p className="text-[11px] text-emerald-300 mt-1">{backupState}</p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={backup}
+          disabled={backupState === 'loading'}
+          className="shrink-0 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer disabled:opacity-60"
+        >
+          {backupState === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          <span>Скачать резервную копию</span>
+        </button>
       </div>
 
       {issued && (

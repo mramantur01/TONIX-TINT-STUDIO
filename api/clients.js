@@ -2,28 +2,7 @@
 // GET  ?q=...                      -> { clients: [{ name, phone, createdAt, bookings, mustChangePassword }] }
 // POST { action: 'reset', phone }  -> { tempPassword }  (shown once to the admin, sent to the client by phone/WhatsApp)
 import crypto from 'node:crypto';
-import { getJson, handleError, hashPassword, isAdmin, phoneKey, readBody, redis, send, setJson } from './_lib.js';
-
-async function allUsers() {
-  const keys = [];
-  let cursor = '0';
-  do {
-    const [next, batch] = await redis(['SCAN', cursor, 'MATCH', 'user:*', 'COUNT', '200']);
-    cursor = String(next);
-    keys.push(...batch);
-  } while (cursor !== '0' && keys.length < 5000);
-  if (keys.length === 0) return [];
-  const values = await redis(['MGET', ...keys]);
-  return values
-    .map((raw, i) => {
-      try {
-        return { key: keys[i].slice(5), ...JSON.parse(raw) };
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean);
-}
+import { allUsers, getJson, handleError, hashPassword, isAdmin, phoneKey, readBody, send, setJson } from './_lib.js';
 
 export default async function handler(req, res) {
   if (!isAdmin(req)) return send(res, 401, { error: 'unauthorized' });

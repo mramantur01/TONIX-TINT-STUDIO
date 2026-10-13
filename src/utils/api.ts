@@ -137,7 +137,26 @@ export const changePassword = (oldPassword: string, newPassword: string) =>
     body: JSON.stringify({ action: 'change_password', oldPassword, newPassword }),
   });
 
-export type AdminClient = { name: string; phone: string; createdAt: string; bookings: number; mustChangePassword: boolean };
+// Admin: save a full JSON backup of the site's data to this computer. Returns how much was saved.
+export async function downloadBackup(): Promise<{ bookings: number; clients: number }> {
+  const data = await request<{ bookings: unknown[]; bookingsArchive: unknown[]; clients: unknown[] }>(
+    '/api/backup',
+    {},
+    true
+  );
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tonix-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return { bookings: data.bookings.length + data.bookingsArchive.length, clients: data.clients.length };
+}
+
+export type AdminClient ={ name: string; phone: string; createdAt: string; bookings: number; mustChangePassword: boolean };
 
 export const fetchClients = (q = '') =>
   request<{ clients: AdminClient[] }>(`/api/clients${q ? `?q=${encodeURIComponent(q)}` : ''}`, {}, true);
