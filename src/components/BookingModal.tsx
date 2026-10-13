@@ -148,7 +148,8 @@ export const BookingModal: React.FC = () => {
       filmBrand: selectedFilmBrand,
       priceKgs: finalPrice,
       paymentMethod,
-      paymentStatus: paymentMethod === 'cash' ? 'pay_on_site' : 'paid',
+      // Nothing is charged online: non-cash methods wait for payment, the studio marks them paid.
+      paymentStatus: paymentMethod === 'cash' ? 'pay_on_site' : 'pending',
       status: 'pending',
       notes,
       tintPermitAssistance
@@ -197,7 +198,9 @@ export const BookingModal: React.FC = () => {
             <TonixLogo size={36} />
             <div>
               <h3 className="text-sm font-extrabold text-white">{t.bookingModalTitle}</h3>
-              <p className="text-[11px] text-slate-400">Шаг {step} из 5 • TONIX TINT STUDIO Бишкек</p>
+              <p className="text-[11px] text-slate-400">
+                {step <= 5 ? `Шаг ${step} из 5` : 'Запись оформлена'} • TONIX TINT STUDIO Бишкек
+              </p>
             </div>
           </div>
 
@@ -724,7 +727,9 @@ export const BookingModal: React.FC = () => {
               <div className="text-xs font-bold text-slate-200">Ваш номер записи</div>
               <div className="text-2xl font-black font-mono text-amber-400 tracking-wide select-all">{confirmedBooking.id}</div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Запись сохранена в вашем личном кабинете — там можно следить за статусом заказа с любого устройства.
+                {clientProfile
+                  ? 'Запись сохранена в вашем личном кабинете — там можно следить за статусом заказа с любого устройства.'
+                  : 'Запись сохранена и видна в админ-панели.'}
               </p>
               <button
                 onClick={() => {

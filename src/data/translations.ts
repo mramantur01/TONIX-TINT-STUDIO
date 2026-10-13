@@ -285,7 +285,7 @@ export const translations: Record<Language, Translations> = {
     notesLabel: "Комментарий / Пожелания к авто",
     permitCheckboxLabel: "Нужна консультация по разрешению на тонировку МВД КР",
     bookingSuccessTitle: "Запись успешно оформлена!",
-    bookingSuccessDesc: "Мы забронировали бокс. Менеджер свяжется с вами за 1 час до визита. Уведомление отправлено в Telegram-бот студии.",
+    bookingSuccessDesc: "Мы забронировали бокс. Менеджер свяжется с вами за 1 час до визита.",
 
     paymentMbank: "MBank QR (0% комиссии)",
     paymentOdengi: "О!Деньги / Мой О!",
@@ -435,7 +435,7 @@ export const translations: Record<Language, Translations> = {
     notesLabel: "Каалоо-тилектер",
     permitCheckboxLabel: "Тонировкага уруксат алуу боюнча кеңеш керек",
     bookingSuccessTitle: "Ийгиликтүү жазылдыңыз!",
-    bookingSuccessDesc: "Сиз үчүн бокс даярдалууда. Администратор 1 саат мурун байланышат. Маалымат студиянын Telegram-ботуна жиберилди.",
+    bookingSuccessDesc: "Сиз үчүн бокс даярдалууда. Администратор 1 саат мурун байланышат.",
 
     paymentMbank: "MBank QR (комиссиясыз)",
     paymentOdengi: "О!Деньги / Мой О!",
@@ -585,7 +585,7 @@ export const translations: Record<Language, Translations> = {
     notesLabel: "Notes / Special Requests",
     permitCheckboxLabel: "Request consultation for official KR tinting permit",
     bookingSuccessTitle: "Booking Confirmed!",
-    bookingSuccessDesc: "Bay has been reserved for your vehicle. Our manager will call you 1 hour prior to appointment. Telegram bot notification has been dispatched.",
+    bookingSuccessDesc: "Bay has been reserved for your vehicle. Our manager will call you 1 hour prior to appointment.",
 
     paymentMbank: "MBank QR (Instant, 0% fee)",
     paymentOdengi: "O!Dengi / My O!",

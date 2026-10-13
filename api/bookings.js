@@ -83,6 +83,8 @@ export default async function handler(req, res) {
       if (!user && !isAdmin(req)) return send(res, 401, { error: 'login_required' });
 
       const booking = sanitize(readBody(req));
+      // A client can't mark their own booking as paid; only the studio confirms payment.
+      if (!isAdmin(req) && booking.paymentStatus === 'paid') booking.paymentStatus = 'pending';
       if (user) {
         booking.userId = clientKey;
         booking.clientPhone = user.phone; // bookings always carry the account's phone
