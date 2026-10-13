@@ -979,6 +979,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsBookingOpen(true);
   };
 
+  // The built-in sample reviews (INITIAL_REVIEWS) stay only until the first real client review
+  // arrives; reviews the admin adds by hand are kept either way.
+  const sampleReviewIds = new Set(INITIAL_REVIEWS.map(r => r.id));
+  const realReviews = publicReviews.filter(p => !reviews.some(r => r.id === p.id));
+  const shownReviews = [
+    ...realReviews,
+    ...(realReviews.length > 0 ? reviews.filter(r => !sampleReviewIds.has(r.id)) : reviews)
+  ];
+
   // Merge dynamic studio settings into translations object for live UI sync
   const baseT = translations[language];
   const t: Translations = {
@@ -1008,7 +1017,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteMaster,
         studioSettings,
         updateStudioSettings,
-        reviews: [...publicReviews.filter(p => !reviews.some(r => r.id === p.id)), ...reviews],
+        reviews: shownReviews,
         addReview,
         deleteReview,
         promotions,
