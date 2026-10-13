@@ -58,6 +58,7 @@ export interface StudioSettings {
   heroTextPosition: 'left' | 'right';
   heroAutoPlay: boolean;
   announcementActive: boolean;
+  carsWrapped: number; // "N+ авто" on the home screen, edited in the admin panel
 }
 
 const DEFAULT_SETTINGS: StudioSettings = {
@@ -75,7 +76,8 @@ const DEFAULT_SETTINGS: StudioSettings = {
   heroSlideInterval: 1800, // fast, dynamic slide speed (responsive to user request)
   heroTextPosition: 'left',
   heroAutoPlay: true,
-  announcementActive: true
+  announcementActive: true,
+  carsWrapped: 4850
 };
 
 interface AppContextType {

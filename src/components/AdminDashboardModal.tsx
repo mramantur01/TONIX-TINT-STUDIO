@@ -202,6 +202,13 @@ export const AdminDashboardModal: React.FC = () => {
   const [cmsYandexMapsLink, setCmsYandexMapsLink] = useState(studioSettings.yandexMapsLink || 'https://yandex.ru/maps/bishkek');
   const [cmsSlideInterval, setCmsSlideInterval] = useState(studioSettings.heroSlideInterval || 2100);
   const [cmsTextPosition, setCmsTextPosition] = useState<'left' | 'right'>(studioSettings.heroTextPosition || 'left');
+  const [cmsCarsWrapped, setCmsCarsWrapped] = useState<string>(String(studioSettings.carsWrapped ?? 4850));
+
+  const saveCarsWrapped = (value: number) => {
+    const val = Math.max(0, Math.min(1_000_000, Math.round(value) || 0));
+    setCmsCarsWrapped(String(val));
+    updateStudioSettings({ carsWrapped: val });
+  };
 
   // --- PORTFOLIO CMS FORM ---
   const [isAddingPortfolio, setIsAddingPortfolio] = useState(false);
@@ -1313,6 +1320,54 @@ export const AdminDashboardModal: React.FC = () => {
                       </button>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Home screen counter: how many cars the studio has done */}
+              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-850 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-black text-white uppercase tracking-wider">
+                      Сколько машин оклеено
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                    Сейчас на сайте: {(Number(studioSettings.carsWrapped) || 0).toLocaleString('ru-RU')}+ авто
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Число показывается на главном экране под кнопками записи («… + Авто»).
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={cmsCarsWrapped}
+                    onChange={e => setCmsCarsWrapped(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveCarsWrapped(Number(cmsCarsWrapped)); }}
+                    className="w-32 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-amber-300 text-center font-mono font-bold focus:outline-none focus:border-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => saveCarsWrapped(Number(cmsCarsWrapped))}
+                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Сохранить</span>
+                  </button>
+                  {[1, 10].map(step => (
+                    <button
+                      key={step}
+                      type="button"
+                      onClick={() => saveCarsWrapped((Number(studioSettings.carsWrapped) || 0) + step)}
+                      className="px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-200 cursor-pointer"
+                      title={`Добавить ${step} и сразу сохранить`}
+                    >
+                      +{step}
+                    </button>
+                  ))}
                 </div>
               </div>
 

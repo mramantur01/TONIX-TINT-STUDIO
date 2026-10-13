@@ -264,7 +264,9 @@ export const Hero: React.FC = () => {
             {/* Compact Trust Stats */}
             <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-800/80 text-center">
               <div>
-                <div className="text-sm font-extrabold text-amber-400">4 850+</div>
+                <div className="text-sm font-extrabold text-amber-400">
+                  {(Number(studioSettings.carsWrapped) || 0).toLocaleString('ru-RU')}+
+                </div>
                 <div className="text-[10px] text-slate-400">{t.heroStatCars}</div>
               </div>
               <div>
