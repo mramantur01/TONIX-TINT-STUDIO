@@ -160,6 +160,9 @@ export const BookingModal: React.FC = () => {
         setTakenSlots(prev => [...prev, { masterId: currentMaster.id, time: bookingTime }]);
         setSubmitError('Это время у мастера уже заняли. Выберите другое время или мастера.');
         setStep(4);
+      } else if (result.error === 'login_required') {
+        setSubmitError('Вход в личный кабинет истёк. Войдите снова — заполненная заявка сохранится, останется только нажать «Подтвердить».');
+        setIsCabinetOpen(true);
       } else {
         setSubmitError(`Не удалось отправить заявку. Попробуйте ещё раз или позвоните нам: ${studioSettings.phone}`);
       }
@@ -596,6 +599,20 @@ export const BookingModal: React.FC = () => {
                   <span className="mt-1 block text-[10px] text-slate-500">Номер из вашего личного кабинета</span>
                 )}
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Комментарий для студии (необязательно):
+              </label>
+              <textarea
+                rows={2}
+                maxLength={1000}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Например: нужна тонировка 15%, приеду к 10:00, есть скол на капоте…"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 resize-none"
+              />
             </div>
 
             {/* Kyrgyz Tint Permit Checkbox */}

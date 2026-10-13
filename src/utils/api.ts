@@ -96,8 +96,9 @@ export const fetchContent = () =>
 export const saveContent = (patch: Record<string, unknown>) =>
   request<{ ok: boolean }>('/api/content', { method: 'PUT', body: JSON.stringify(patch) }, true);
 
+// Sent with the client token, and with the admin token too when the studio books for a client.
 export const createBooking = (booking: Omit<Booking, 'createdAt' | 'telegramSent'>) =>
-  request<{ booking: Booking }>('/api/bookings', { method: 'POST', body: JSON.stringify(booking) });
+  request<{ booking: Booking }>('/api/bookings', { method: 'POST', body: JSON.stringify(booking) }, true);
 
 export const fetchBookings = () => request<{ bookings: Booking[] }>('/api/bookings', {}, true);
 

@@ -28,7 +28,9 @@ import {
 // Local `vite dev` has no /api functions, so the admin panel opens without a password there.
 const DEV_MODE = import.meta.env.DEV;
 
-export type AddBookingResult = { ok: true; booking: Booking } | { ok: false; error: 'slot_taken' | 'error' };
+export type AddBookingResult =
+  | { ok: true; booking: Booking }
+  | { ok: false; error: 'slot_taken' | 'login_required' | 'error' };
 
 export type AdminTab = 
   | 'orders' 
@@ -801,6 +803,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       const code = (err as Error).message;
       if (code === 'slot_taken') return { ok: false, error: 'slot_taken' };
+      if (code === 'login_required') {
+        // The client's session expired: drop it so the cabinet asks to sign in again.
+        setClientToken(null);
+        setIsClientLoggedIn(false);
+        return { ok: false, error: 'login_required' };
+      }
       if (!DEV_MODE) return { ok: false, error: 'error' };
       // Local `vite dev` has no /api: keep the booking in this browser only.
       newBooking = { ...bookingData, id: newId, createdAt: new Date().toISOString(), telegramSent: false };
