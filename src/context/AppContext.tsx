@@ -28,6 +28,8 @@ import {
 // Local `vite dev` has no /api functions, so the admin panel opens without a password there.
 const DEV_MODE = import.meta.env.DEV;
 
+export type AddBookingResult = { ok: true; booking: Booking } | { ok: false; error: 'slot_taken' | 'error' };
+
 export type AdminTab = 
   | 'orders' 
   | 'site_cms' 
@@ -137,7 +139,7 @@ interface AppContextType {
   openBookingWithPreselect: (serviceId?: string, carCategory?: CarCategory) => void;
 
   // Actions
-  addBooking: (newBooking: Omit<Booking, 'id' | 'createdAt' | 'telegramSent'>) => Booking;
+  addBooking: (newBooking: Omit<Booking, 'id' | 'createdAt' | 'telegramSent'>) => Promise<AddBookingResult>;
   updateBookingStatus: (id: string, status: Booking['status']) => void;
   
   // User Security & 2FA
@@ -787,40 +789,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Bookings
-  const addBooking = (bookingData: Omit<Booking, 'id' | 'createdAt' | 'telegramSent'>): Booking => {
+  // Resolves only after the server has stored the booking, so the client never sees
+  // a success screen for a booking the studio did not receive.
+  const addBooking = async (bookingData: Omit<Booking, 'id' | 'createdAt' | 'telegramSent'>): Promise<AddBookingResult> => {
     const newId = `BK-${Date.now().toString(36).toUpperCase()}${Math.floor(10 + Math.random() * 90)}`;
-    const newBooking: Booking = {
-      ...bookingData,
-      id: newId,
-      createdAt: new Date().toISOString(),
-      telegramSent: false
-    };
+    let newBooking: Booking;
+    try {
+      ({ booking: newBooking } = await createBooking({ ...bookingData, id: newId }));
+    } catch (err) {
+      const code = (err as Error).message;
+      if (code === 'slot_taken') return { ok: false, error: 'slot_taken' };
+      if (!DEV_MODE) return { ok: false, error: 'error' };
+      // Local `vite dev` has no /api: keep the booking in this browser only.
+      newBooking = { ...bookingData, id: newId, createdAt: new Date().toISOString(), telegramSent: false };
+    }
 
-    const updated = [newBooking, ...bookings];
-    setBookings(updated);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.BOOKINGS, JSON.stringify(updated));
-
-    // Send the booking to the studio (server stores it and notifies Telegram).
-    createBooking({ ...bookingData, id: newId })
-      .then(({ booking }) => {
-        if (getClientToken()) {
-          setClientBookings(prev => [booking, ...prev.filter(b => b.id !== booking.id)]);
-        }
-        setBookings(prev => {
-          const next = prev.map(b => (b.id === newId ? { ...b, telegramSent: booking.telegramSent } : b));
-          try { localStorage.setItem(LOCAL_STORAGE_KEYS.BOOKINGS, JSON.stringify(next)); } catch { /* ignore */ }
-          return next;
-        });
-      })
-      .catch(() => {
-        if (!DEV_MODE) {
-          addNotification(
-            'Запись не отправлена',
-            `Не удалось передать заявку в студию. Позвоните нам: ${studioSettings.phone}`,
-            'alert'
-          );
-        }
-      });
+    if (getClientToken()) {
+      setClientBookings(prev => [newBooking, ...prev.filter(b => b.id !== newBooking.id)]);
+    }
+    setBookings(prev => {
+      const next = [newBooking, ...prev.filter(b => b.id !== newBooking.id)];
+      try { localStorage.setItem(LOCAL_STORAGE_KEYS.BOOKINGS, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
 
     // Telegram Bot notification simulation
     const tgMsg = `🔔 Новая запись ${newId} в TONIX TINT STUDIO!\n🚗 Авто: ${newBooking.carBrand} ${newBooking.carModel} (${newBooking.carYear})\n🛠 Услуга: ${newBooking.serviceTitle}\n👨‍🔧 Мастер: ${newBooking.masterName}\n📅 Дата: ${newBooking.bookingDate} в ${newBooking.bookingTime}\n💰 Сумма: ${newBooking.priceKgs.toLocaleString()} KGS\n👤 Клиент: ${newBooking.clientName} (${newBooking.clientPhone})\n💳 Оплата: ${newBooking.paymentMethod.toUpperCase()}`;
@@ -838,7 +829,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addNotification('Новая запись оформлена!', `Заказ #${newId} передан мастеру ${newBooking.masterName}.`, 'success');
     addSecurityLog(`Оформлена онлайн-запись ${newId} на сумму ${newBooking.priceKgs} KGS`, 'success');
 
-    return newBooking;
+    return { ok: true, booking: newBooking };
   };
 
   const updateBookingStatus = (id: string, status: Booking['status']) => {

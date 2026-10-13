@@ -1104,7 +1104,10 @@ export const AdminDashboardModal: React.FC = () => {
                             )}
                           </td>
                           <td className="p-3.5 font-bold text-white">
-                            {b.carBrand} {b.carModel} ({b.carYear})
+                            {b.carBrand} {b.carModel}{b.carYear ? ` (${b.carYear})` : ''}
+                            {b.plateNumber && (
+                              <div className="text-[10px] font-mono text-slate-400">{b.plateNumber}</div>
+                            )}
                           </td>
                           <td className="p-3.5">
                             <div className="font-medium text-slate-200">{b.serviceTitle}</div>

@@ -13,7 +13,7 @@ import {
   Instagram,
   Send
 } from 'lucide-react';
-import { getInstagramUrl, getInstagramUsername, getWhatsappUrl, getTelegramUrl } from '../utils/socialUtils';
+import { get2gisUrl, getInstagramUrl, getInstagramUsername, getWhatsappUrl, getTelegramUrl, getYandexMapsUrl } from '../utils/socialUtils';
 
 export const LocationMap: React.FC = () => {
   const { t, studioSettings } = useApp();
@@ -97,7 +97,7 @@ export const LocationMap: React.FC = () => {
               {/* Direct Maps Links */}
               <div className="pt-2 space-y-2.5">
                 <a
-                  href={studioSettings.gisLink || "https://2gis.kg/bishkek"}
+                  href={get2gisUrl(studioSettings.gisLink, studioSettings.address)}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full py-3 px-4 rounded-xl bg-emerald-600/20 border border-emerald-500/40 hover:bg-emerald-600/30 text-emerald-400 font-bold text-xs flex items-center justify-between transition-colors"
@@ -110,7 +110,7 @@ export const LocationMap: React.FC = () => {
                 </a>
 
                 <a
-                  href={studioSettings.yandexMapsLink || "https://yandex.com/maps/10309/bishkek"}
+                  href={getYandexMapsUrl(studioSettings.yandexMapsLink, studioSettings.address)}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full py-3 px-4 rounded-xl bg-red-600/20 border border-red-500/40 hover:bg-red-600/30 text-red-400 font-bold text-xs flex items-center justify-between transition-colors"
@@ -214,7 +214,7 @@ export const LocationMap: React.FC = () => {
               <div className="relative z-10 flex items-center justify-between">
                 <div className="bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Проспект Жибек-Жолу, 730/1, Ленинский, г. Бишкек, 720033</span>
+                  <span>{studioSettings.address}</span>
                 </div>
 
                 <div className="bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold text-amber-400">
@@ -230,7 +230,7 @@ export const LocationMap: React.FC = () => {
                 </div>
 
                 <a
-                  href="https://2gis.kg/bishkek"
+                  href={get2gisUrl(studioSettings.gisLink, studioSettings.address)}
                   target="_blank"
                   rel="noreferrer"
                   className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 text-center transition-colors"

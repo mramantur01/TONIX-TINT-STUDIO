@@ -41,6 +41,7 @@ export interface Booking {
   carModel: string;
   carYear: number;
   carCategory: CarCategory;
+  plateNumber?: string;
   serviceId: string;
   serviceTitle: string;
   masterId: string;

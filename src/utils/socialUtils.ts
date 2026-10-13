@@ -50,6 +50,18 @@ export function getWhatsappUrl(phone?: string, text?: string): string {
   return `https://wa.me/${digits}${encodedText}`;
 }
 
+// A map link set in the admin panel is used as is, unless it is just the city page
+// (e.g. https://2gis.kg/bishkek); then the studio address is searched instead.
+const isCityOnlyLink = (link?: string) => !link || /^https?:\/\/[^/]+\/(maps\/)?(\d+\/)?bishkek\/?$/i.test(link.trim());
+
+export function get2gisUrl(link: string | undefined, address: string): string {
+  return isCityOnlyLink(link) ? `https://2gis.kg/bishkek/search/${encodeURIComponent(address)}` : link!.trim();
+}
+
+export function getYandexMapsUrl(link: string | undefined, address: string): string {
+  return isCityOnlyLink(link) ? `https://yandex.ru/maps/?text=${encodeURIComponent(address)}` : link!.trim();
+}
+
 export function getTelegramUrl(handleOrBot?: string): string {
   if (!handleOrBot) return 'https://t.me/tonix_tint_kg';
   const clean = handleOrBot.trim();

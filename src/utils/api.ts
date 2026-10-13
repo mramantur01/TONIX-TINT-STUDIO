@@ -101,6 +101,10 @@ export const createBooking = (booking: Omit<Booking, 'createdAt' | 'telegramSent
 
 export const fetchBookings = () => request<{ bookings: Booking[] }>('/api/bookings', {}, true);
 
+// Public: which master/time slots are already taken on a date (no client details).
+export const fetchTakenSlots = (date: string) =>
+  request<{ taken: { masterId: string; time: string }[] }>(`/api/bookings?date=${encodeURIComponent(date)}`);
+
 export const patchBookingStatus = (id: string, status: Booking['status']) =>
   request<{ ok: boolean }>('/api/bookings', { method: 'PATCH', body: JSON.stringify({ id, status }) }, true);
 

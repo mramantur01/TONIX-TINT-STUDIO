@@ -78,7 +78,7 @@ const HERO_SLIDES: HeroSlide[] = [
 ];
 
 export const Hero: React.FC = () => {
-  const { t, language, reviews, setIsBookingOpen, openBookingWithPreselect, heroSlides, studioSettings, updateStudioSettings } = useApp();
+  const { t, language, reviews, setIsBookingOpen, openBookingWithPreselect, heroSlides, studioSettings, updateStudioSettings, isAdminAuthed } = useApp();
   const rating = reviewStats(reviews);
   const slides = heroSlides && heroSlides.length > 0 ? heroSlides : [];
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -172,16 +172,18 @@ export const Hero: React.FC = () => {
                 </div>
               </div>
 
-              {/* Position Switcher: Left / Right (only matters on wide screens) */}
-              <button
-                type="button"
-                onClick={toggleTextPosition}
-                className="hidden lg:inline-flex shrink-0 items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-700 hover:border-amber-500/50 text-[10px] text-slate-300 hover:text-white transition-colors cursor-pointer"
-                title="Переключить положение блока: Слева / Справа"
-              >
-                <MoveHorizontal className="w-3 h-3 text-amber-400" />
-                <span>{textPosition === 'left' ? 'Слева' : 'Справа'}</span>
-              </button>
+              {/* Position Switcher: Left / Right — an admin layout setting, only matters on wide screens */}
+              {isAdminAuthed && (
+                <button
+                  type="button"
+                  onClick={toggleTextPosition}
+                  className="hidden lg:inline-flex shrink-0 items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-700 hover:border-amber-500/50 text-[10px] text-slate-300 hover:text-white transition-colors cursor-pointer"
+                  title="Переключить положение блока: Слева / Справа"
+                >
+                  <MoveHorizontal className="w-3 h-3 text-amber-400" />
+                  <span>{textPosition === 'left' ? 'Слева' : 'Справа'}</span>
+                </button>
+              )}
             </div>
 
             {/* Compact Headline */}

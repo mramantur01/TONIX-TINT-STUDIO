@@ -21,7 +21,13 @@ import {
   QrCode
 } from 'lucide-react';
 import { TonixLogo } from './TonixLogo';
-import { discountedPrice, findPromotion } from '../utils/pricing';
+import { discountedPrice, findPromotion, servicePrice } from '../utils/pricing';
+import { fetchTakenSlots } from '../utils/api';
+import { getWhatsappUrl } from '../utils/socialUtils';
+
+// Dates as YYYY-MM-DD in the visitor's local time zone (toISOString would use UTC).
+const localDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export const BookingModal: React.FC = () => {
   const { 
@@ -35,17 +41,18 @@ export const BookingModal: React.FC = () => {
     addBooking, 
     activePromoCode,
     promotions,
-    bookingPreselection
+    bookingPreselection,
+    studioSettings
   } = useApp();
 
   const [step, setStep] = useState<number>(1);
 
   // Form State
   const [carCategory, setCarCategory] = useState<CarCategory>('crossover');
-  const [carBrand, setCarBrand] = useState('Toyota');
-  const [carModel, setCarModel] = useState('Camry 70');
-  const [carYear, setCarYear] = useState(2023);
-  const [plateNumber, setPlateNumber] = useState('01KG 777 AAA');
+  const [carBrand, setCarBrand] = useState('');
+  const [carModel, setCarModel] = useState('');
+  const [carYear, setCarYear] = useState('');
+  const [plateNumber, setPlateNumber] = useState('');
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>('tint-rear');
   const [selectedFilmBrand, setSelectedFilmBrand] = useState<string>('LLumar ATR (USA)');
@@ -54,9 +61,12 @@ export const BookingModal: React.FC = () => {
   const [bookingDate, setBookingDate] = useState<string>(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+    return localDate(tomorrow);
   });
   const [bookingTime, setBookingTime] = useState<string>('11:30');
+  const [takenSlots, setTakenSlots] = useState<{ masterId: string; time: string }[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('+996 ');
@@ -86,25 +96,49 @@ export const BookingModal: React.FC = () => {
     }
   }, [bookingPreselection]);
 
+  // Slots already booked on the chosen date, so the client can't pick them.
+  useEffect(() => {
+    if (!isBookingOpen || !bookingDate) return;
+    let cancelled = false;
+    fetchTakenSlots(bookingDate)
+      .then(({ taken }) => { if (!cancelled) setTakenSlots(taken); })
+      .catch(() => { if (!cancelled) setTakenSlots([]); });
+    return () => { cancelled = true; };
+  }, [isBookingOpen, bookingDate]);
+
   if (!isBookingOpen) return null;
 
   const currentService = services.find(s => s.id === selectedServiceId) || services[0];
   const currentMaster = masters.find(m => m.id === selectedMasterId) || masters[0];
 
+  const today = localDate(new Date());
+  const isSlotUnavailable = (time: string) => {
+    if (takenSlots.some(s => s.masterId === currentMaster?.id && s.time === time)) return true;
+    if (bookingDate !== today) return false;
+    const [h, m] = time.split(':').map(Number);
+    const now = new Date();
+    return h * 60 + m <= now.getHours() * 60 + now.getMinutes();
+  };
+  const carStepValid = carBrand.trim().length > 0 && carModel.trim().length > 0;
+  const dateStepValid = bookingDate >= today && !isSlotUnavailable(bookingTime);
+
   // Calculate price based on category
   const finalPrice = discountedPrice(currentService, carCategory, findPromotion(promotions, activePromoCode));
 
-  const handleConfirm = (e: React.FormEvent) => {
+  const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientName.trim() || clientPhone.length < 9) return;
+    if (!clientName.trim() || clientPhone.length < 9 || isSubmitting) return;
 
-    const created = addBooking({
+    setIsSubmitting(true);
+    setSubmitError(null);
+    const result = await addBooking({
       clientName: clientName.trim(),
       clientPhone: clientPhone.trim(),
-      carBrand,
-      carModel,
-      carYear,
+      carBrand: carBrand.trim(),
+      carModel: carModel.trim(),
+      carYear: Number(carYear) || 0,
       carCategory,
+      plateNumber: plateNumber.trim(),
       serviceId: currentService.id,
       serviceTitle: currentService.titleKey,
       masterId: currentMaster.id,
@@ -119,8 +153,20 @@ export const BookingModal: React.FC = () => {
       notes,
       tintPermitAssistance
     });
+    setIsSubmitting(false);
 
-    setConfirmedBooking(created);
+    if (!result.ok) {
+      if (result.error === 'slot_taken') {
+        setTakenSlots(prev => [...prev, { masterId: currentMaster.id, time: bookingTime }]);
+        setSubmitError('Это время у мастера уже заняли. Выберите другое время или мастера.');
+        setStep(4);
+      } else {
+        setSubmitError(`Не удалось отправить заявку. Попробуйте ещё раз или позвоните нам: ${studioSettings.phone}`);
+      }
+      return;
+    }
+
+    setConfirmedBooking(result.booking);
     setStep(6); // Success view
 
     try {
@@ -236,16 +282,32 @@ export const BookingModal: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Модель авто:
+                  Модель авто: *
                 </label>
                 <input
                   type="text"
                   value={carModel}
                   onChange={e => setCarModel(e.target.value)}
                   placeholder="Например: Camry 70 / LX570 / Zeekr 001"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Год выпуска:
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1980}
+                  max={new Date().getFullYear() + 1}
+                  value={carYear}
+                  onChange={e => setCarYear(e.target.value.slice(0, 4))}
+                  placeholder="Например: 2022"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
@@ -264,10 +326,14 @@ export const BookingModal: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-800 flex justify-end">
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
+              {!carStepValid && (
+                <span className="text-[11px] text-slate-500">Укажите марку и модель авто</span>
+              )}
               <button
                 onClick={() => setStep(2)}
-                className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
+                disabled={!carStepValid}
+                className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span>{t.nextStep}</span>
                 <ArrowRight className="w-4 h-4" />
@@ -304,7 +370,7 @@ export const BookingModal: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <div className="font-black text-amber-400 text-xs">
-                        {s.priceCrossover.toLocaleString()} KGS
+                        {servicePrice(s, carCategory).toLocaleString()} KGS
                       </div>
                       <div className="text-[10px] text-slate-500">~{s.durationHours} ч.</div>
                     </div>
@@ -421,8 +487,9 @@ export const BookingModal: React.FC = () => {
               </label>
               <input
                 type="date"
+                min={today}
                 value={bookingDate}
-                onChange={e => setBookingDate(e.target.value)}
+                onChange={e => { setBookingDate(e.target.value); setSubmitError(null); }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-500"
               />
             </div>
@@ -432,21 +499,35 @@ export const BookingModal: React.FC = () => {
                 {t.selectTime}:
               </label>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {timeSlots.map(time => (
-                  <button
-                    key={time}
-                    type="button"
-                    onClick={() => setBookingTime(time)}
-                    className={`py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
-                      bookingTime === time
-                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
-                        : 'bg-slate-950 border border-slate-800 text-slate-300 hover:border-slate-700'
-                    }`}
-                  >
-                    {time}
-                  </button>
-                ))}
+                {timeSlots.map(time => {
+                  const unavailable = isSlotUnavailable(time);
+                  return (
+                    <button
+                      key={time}
+                      type="button"
+                      disabled={unavailable}
+                      onClick={() => { setBookingTime(time); setSubmitError(null); }}
+                      title={unavailable ? 'Время занято или уже прошло' : undefined}
+                      className={`py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all disabled:cursor-not-allowed disabled:opacity-35 disabled:line-through ${
+                        bookingTime === time && !unavailable
+                          ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
+                          : 'bg-slate-950 border border-slate-800 text-slate-300 hover:border-slate-700'
+                      }`}
+                    >
+                      {time}
+                    </button>
+                  );
+                })}
               </div>
+              {bookingDate < today && (
+                <p className="mt-2 text-[11px] text-red-400">Эта дата уже прошла — выберите сегодня или позже.</p>
+              )}
+              {bookingDate >= today && isSlotUnavailable(bookingTime) && (
+                <p className="mt-2 text-[11px] text-amber-400">Выбранное время недоступно у мастера {currentMaster?.name} — выберите другое.</p>
+              )}
+              {submitError && step === 4 && (
+                <p className="mt-2 text-[11px] text-red-400">{submitError}</p>
+              )}
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
@@ -464,8 +545,9 @@ export const BookingModal: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setStep(5)}
-                className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
+                onClick={() => { setSubmitError(null); setStep(5); }}
+                disabled={!dateStepValid}
+                className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span>{t.nextStep}</span>
                 <ArrowRight className="w-4 h-4" />
@@ -570,10 +652,14 @@ export const BookingModal: React.FC = () => {
                 </div>
               </div>
               <div className="text-right text-[11px] text-slate-400">
-                <div>{carBrand} {carModel}</div>
+                <div>{carBrand} {carModel}{carYear ? ` (${carYear})` : ''}</div>
                 <div>{bookingDate} в {bookingTime}</div>
               </div>
             </div>
+
+            {submitError && (
+              <p className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-[11px] text-red-300">{submitError}</p>
+            )}
 
             <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
               <button
@@ -587,9 +673,10 @@ export const BookingModal: React.FC = () => {
 
               <button
                 type="submit"
-                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20"
+                disabled={isSubmitting}
+                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20 disabled:opacity-60 disabled:cursor-wait"
               >
-                <span>{t.confirmBooking}</span>
+                <span>{isSubmitting ? 'Отправляем…' : t.confirmBooking}</span>
                 <Send className="w-4 h-4" />
               </button>
             </div>
@@ -638,7 +725,10 @@ export const BookingModal: React.FC = () => {
             {/* Action buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <a
-                href={`https://wa.me/996700910777?text=Здравствуйте!%20Я%20оформил%20запись%20${confirmedBooking.id}%20на%20${confirmedBooking.carBrand}%20${confirmedBooking.carModel}%20в%20TONIX%20TINT%20STUDIO`}
+                href={getWhatsappUrl(
+                  studioSettings.whatsapp,
+                  `Здравствуйте! Я оформил запись ${confirmedBooking.id} на ${confirmedBooking.carBrand} ${confirmedBooking.carModel} в TONIX TINT STUDIO`
+                )}
                 target="_blank"
                 rel="noreferrer"
                 className="w-full sm:w-auto px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wide flex items-center justify-center gap-2"
