@@ -259,6 +259,18 @@ export const AdminDashboardModal: React.FC = () => {
 
   // Master Editing state
   const [editingMasterId, setEditingMasterId] = useState<string | null>(null);
+  // Unsaved "cars done" numbers typed on master cards, keyed by master id.
+  const [carsDraft, setCarsDraft] = useState<Record<string, string>>({});
+
+  const saveMasterCars = (id: string, value: number) => {
+    const val = Math.max(0, Math.min(1_000_000, Math.round(value) || 0));
+    updateMaster(id, { completedCars: val });
+    setCarsDraft(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
   const [editMasterForm, setEditMasterForm] = useState<{
     name: string;
     role: string;
@@ -2454,6 +2466,42 @@ export const AdminDashboardModal: React.FC = () => {
                               title={`Установить стаж ${yrs} лет`}
                             >
                               {yrs} лет
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Cars Done Quick Editor (shown as "N+ авто" on the masters section) */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <span className="text-[11px] text-amber-400 font-bold">Оклеено авто:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={carsDraft[m.id] ?? String(m.completedCars)}
+                            onChange={e => setCarsDraft(prev => ({ ...prev, [m.id]: e.target.value }))}
+                            onKeyDown={e => { if (e.key === 'Enter') saveMasterCars(m.id, Number(carsDraft[m.id] ?? m.completedCars)); }}
+                            className="w-24 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white text-center font-mono font-bold focus:outline-none focus:border-amber-500"
+                            title="Число на странице мастера: «… + авто»"
+                          />
+                          {carsDraft[m.id] !== undefined && Number(carsDraft[m.id]) !== m.completedCars && (
+                            <button
+                              type="button"
+                              onClick={() => saveMasterCars(m.id, Number(carsDraft[m.id]))}
+                              className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] cursor-pointer flex items-center gap-1"
+                            >
+                              <Save className="w-3 h-3" />
+                              <span>Сохранить</span>
+                            </button>
+                          )}
+                          {[1, 10].map(step => (
+                            <button
+                              key={step}
+                              type="button"
+                              onClick={() => saveMasterCars(m.id, m.completedCars + step)}
+                              className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-bold text-slate-200 cursor-pointer"
+                              title={`Добавить ${step} и сразу сохранить`}
+                            >
+                              +{step}
                             </button>
                           ))}
                         </div>
