@@ -162,19 +162,19 @@ export const Hero: React.FC = () => {
             
             {/* Top Row: Official Emblem, Location Badge & Position Toggle */}
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <TonixLogo size={40} />
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-300 text-[11px] font-bold">
-                  <MapPin className="w-3 h-3 text-amber-400" />
-                  <span className="truncate max-w-[200px] sm:max-w-none">{studioSettings.address}</span>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-300 text-[11px] font-bold min-w-0">
+                  <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span className="truncate">{studioSettings.address}</span>
                 </div>
               </div>
 
-              {/* Position Switcher: Left / Right */}
+              {/* Position Switcher: Left / Right (only matters on wide screens) */}
               <button
                 type="button"
                 onClick={toggleTextPosition}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-700 hover:border-amber-500/50 text-[10px] text-slate-300 hover:text-white transition-colors cursor-pointer"
+                className="hidden lg:inline-flex shrink-0 items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-700 hover:border-amber-500/50 text-[10px] text-slate-300 hover:text-white transition-colors cursor-pointer"
                 title="Переключить положение блока: Слева / Справа"
               >
                 <MoveHorizontal className="w-3 h-3 text-amber-400" />
