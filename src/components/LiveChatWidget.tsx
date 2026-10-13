@@ -19,7 +19,7 @@ interface ChatMessage {
 }
 
 export const LiveChatWidget: React.FC = () => {
-  const { isChatOpen, setIsChatOpen, setIsBookingOpen } = useApp();
+  const { isChatOpen, setIsChatOpen, setIsBookingOpen, studioSettings } = useApp();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -52,7 +52,7 @@ export const LiveChatWidget: React.FC = () => {
 
     // Generate responsive bot reply
     setTimeout(() => {
-      let botResponse = 'Спасибо за вопрос! Шеф-мастер и контактное лицо студии Кадырбеков Арген на связи. Вы можете записаться прямо сейчас или написать лично Аргену в WhatsApp (+996 700 910 777).';
+      let botResponse = `Спасибо за вопрос! Я автоматический помощник, а живой ответ даст ${studioSettings.contactPerson.split('(')[0].trim()}: напишите в WhatsApp ${studioSettings.whatsapp} или позвоните ${studioSettings.phone}. Записаться можно прямо на сайте.`;
       const lower = text.toLowerCase();
 
       if (lower.includes('разреш') || lower.includes('унаа') || lower.includes('тюндюк') || lower.includes('тундук')) {
@@ -60,7 +60,7 @@ export const LiveChatWidget: React.FC = () => {
       } else if (lower.includes('цен') || lower.includes('стоим') || lower.includes('передн') || lower.includes('задн')) {
         botResponse = 'Тонировка задней полусферы (Llumar ATR) — от 4 500 сом. Передние боковые — от 3 500 сом. Наш интерактивный калькулятор на сайте рассчитает точную сумму для вашей марки!';
       } else if (lower.includes('где') || lower.includes('адрес') || lower.includes('находит')) {
-        botResponse = 'Мы находимся в Бишкеке: проспект Жибек-Жолу, 730/1 (Ленинский район, почтовый индекс 720033). У нас удобный заезд и закрытая охраняемая парковка. Работаем с 09:00 до 21:00 ежедневно.';
+        botResponse = `Наш адрес: ${studioSettings.address}. У нас удобный заезд и закрытая охраняемая парковка. Режим работы: ${studioSettings.workHours}.`;
       } else if (lower.includes('пленк') || lower.includes('ppf') || lower.includes('брон')) {
         botResponse = 'Мы работаем исключительно с оригинальным американским полиуретаном STEK DYNOshield и LLumar Platinum (толщина 215 микрон с функцией самозатягивания царапин Top-Coat). Гарантия 10 лет!';
       }
