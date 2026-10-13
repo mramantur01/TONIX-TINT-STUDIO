@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   ShieldCheck, 
@@ -40,6 +40,35 @@ export const Navbar: React.FC = () => {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
 
+  const headerRef = useRef<HTMLElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Open menus close on a click/tap anywhere outside them, or on Escape.
+  useEffect(() => {
+    if (!langDropdownOpen && !notifDropdownOpen && !mobileMenuOpen) return;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (!langRef.current?.contains(target)) setLangDropdownOpen(false);
+      if (!notifRef.current?.contains(target)) setNotifDropdownOpen(false);
+      if (!headerRef.current?.contains(target)) setMobileMenuOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setLangDropdownOpen(false);
+      setNotifDropdownOpen(false);
+      setMobileMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [langDropdownOpen, notifDropdownOpen, mobileMenuOpen]);
+
   const activeBookingsCount = clientBookings.filter(b => b.status === 'in_progress' || b.status === 'ready').length;
 
   const languages: { code: Language; label: string; flag: string }[] = [
@@ -49,7 +78,7 @@ export const Navbar: React.FC = () => {
   ];
 
   return (
-    <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/90 border-b border-slate-800/80 transition-colors dark:bg-slate-900/90 light:bg-white/95">
+    <header ref={headerRef} className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/90 border-b border-slate-800/80 transition-colors dark:bg-slate-900/90 light:bg-white/95">
       {/* Top micro announcement bar */}
       <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500 text-slate-950 text-xs font-semibold py-1.5 px-4 text-center flex items-center justify-center gap-2">
         <Sparkles className="w-3.5 h-3.5 animate-pulse" />
@@ -92,8 +121,8 @@ export const Navbar: React.FC = () => {
           <div className="hidden lg:flex items-center gap-3">
             
             {/* Language Selector */}
-            <div className="relative">
-              <button 
+            <div className="relative" ref={langRef}>
+              <button
                 onClick={() => setLangDropdownOpen(!langDropdownOpen)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900/80 text-xs font-semibold text-slate-300 hover:border-amber-500/40 transition-colors"
                 title="Сменить язык / Switch language"
@@ -133,7 +162,7 @@ export const Navbar: React.FC = () => {
             </button>
 
             {/* Notification Bell */}
-            <div className="relative">
+            <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
                 className="relative p-2 rounded-lg border border-slate-800 bg-slate-900/80 text-slate-300 hover:text-amber-400 hover:border-amber-500/40 transition-colors"
