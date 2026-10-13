@@ -16,6 +16,7 @@ import {
   handleError,
   hashPassword,
   issueClientToken,
+  listPatch,
   phoneKey,
   readBody,
   send,
@@ -127,8 +128,8 @@ export default async function handler(req, res) {
         return send(res, 404, { error: 'not_found' });
       }
       if (target.userId && target.userId !== key) return send(res, 404, { error: 'not_found' });
+      await listPatch('bookings', target.id, { userId: key });
       const updated = all.map((b) => (b === target ? { ...b, userId: key } : b));
-      await setJson('bookings', updated);
       return send(res, 200, { bookings: visibleBookings(updated, user, key) });
     }
 

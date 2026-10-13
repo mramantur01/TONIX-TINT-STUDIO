@@ -6,10 +6,11 @@ import {
   getJson,
   handleError,
   isAdmin,
+  listPatch,
+  listPrepend,
   notifyTelegram,
   readBody,
   send,
-  setJson,
 } from './_lib.js';
 
 const KEY = 'bookings';
@@ -82,8 +83,7 @@ export default async function handler(req, res) {
         return send(res, 400, { error: 'missing_fields' });
       }
       booking.telegramSent = await notifyTelegram(telegramText(booking));
-      const list = await getJson(KEY, []);
-      await setJson(KEY, [booking, ...list].slice(0, MAX_BOOKINGS));
+      await listPrepend(KEY, booking, MAX_BOOKINGS);
       return send(res, 201, { booking });
     }
 
@@ -96,9 +96,8 @@ export default async function handler(req, res) {
     if (req.method === 'PATCH') {
       const { id, status } = readBody(req);
       if (!STATUSES.includes(status)) return send(res, 400, { error: 'bad_status' });
-      const list = await getJson(KEY, []);
-      const updated = list.map((b) => (b.id === id ? { ...b, status } : b));
-      await setJson(KEY, updated);
+      if (typeof id !== 'string' || !id) return send(res, 400, { error: 'bad_id' });
+      await listPatch(KEY, id, { status });
       return send(res, 200, { ok: true });
     }
 

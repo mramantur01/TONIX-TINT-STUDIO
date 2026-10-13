@@ -21,6 +21,7 @@ import {
   QrCode
 } from 'lucide-react';
 import { TonixLogo } from './TonixLogo';
+import { discountedPrice, findPromotion } from '../utils/pricing';
 
 export const BookingModal: React.FC = () => {
   const { 
@@ -32,8 +33,9 @@ export const BookingModal: React.FC = () => {
     services, 
     masters, 
     addBooking, 
-    activePromoCode, 
-    bookingPreselection 
+    activePromoCode,
+    promotions,
+    bookingPreselection
   } = useApp();
 
   const [step, setStep] = useState<number>(1);
@@ -90,23 +92,7 @@ export const BookingModal: React.FC = () => {
   const currentMaster = masters.find(m => m.id === selectedMasterId) || masters[0];
 
   // Calculate price based on category
-  const getPrice = () => {
-    let base = currentService.priceCrossover;
-    if (carCategory === 'sedan') base = currentService.priceSedan;
-    if (carCategory === 'crossover') base = currentService.priceCrossover;
-    if (carCategory === 'suv') base = currentService.priceSuv;
-    if (carCategory === 'premium') base = currentService.pricePremium;
-
-    if (activePromoCode === 'BISHKEK_PPF20') {
-      return Math.round(base * 0.8);
-    }
-    if (activePromoCode === 'LLUMAR_WEB15') {
-      return Math.round(base * 0.85);
-    }
-    return base;
-  };
-
-  const finalPrice = getPrice();
+  const finalPrice = discountedPrice(currentService, carCategory, findPromotion(promotions, activePromoCode));
 
   const handleConfirm = (e: React.FormEvent) => {
     e.preventDefault();

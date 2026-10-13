@@ -39,7 +39,11 @@ export interface Translations {
   statClients: string;
   statWarranty: string;
   statExperience: string;
-  statRating: string;
+  heroStatCars: string;
+  heroStatWarrantyValue: string;
+  heroStatWarranty: string;
+  heroStatExperienceValue: string;
+  heroStatExperience: string;
 
   // Car categories
   carSedan: string;
@@ -199,7 +203,11 @@ export const translations: Record<Language, Translations> = {
     statClients: "4 850+ оклеенных авто",
     statWarranty: "до 10 лет гарантия",
     statExperience: "9+ лет опыта мастеров",
-    statRating: "4.9 / 5.0 (520+ отзывов)",
+    heroStatCars: "Авто",
+    heroStatWarrantyValue: "до 10 лет",
+    heroStatWarranty: "Гарантия",
+    heroStatExperienceValue: "10+ лет",
+    heroStatExperience: "Опыт",
 
     carSedan: "Седан / Хэтчбек",
     carCrossover: "Кроссовер",
@@ -345,7 +353,11 @@ export const translations: Record<Language, Translations> = {
     statClients: "4 850+ капталган авто",
     statWarranty: "10 жылга чейин кепилдик",
     statExperience: "9+ жылдык тажрыйба",
-    statRating: "4.9 / 5.0 (520+ пикир)",
+    heroStatCars: "Авто",
+    heroStatWarrantyValue: "10 жылга чейин",
+    heroStatWarranty: "Кепилдик",
+    heroStatExperienceValue: "10+ жыл",
+    heroStatExperience: "Тажрыйба",
 
     carSedan: "Седан / Хэтчбек",
     carCrossover: "Кроссовер",
@@ -491,7 +503,11 @@ export const translations: Record<Language, Translations> = {
     statClients: "4,850+ Vehicles Protected",
     statWarranty: "Up to 10 yrs Warranty",
     statExperience: "9+ Years Master Expertise",
-    statRating: "4.9 / 5.0 (520+ Reviews)",
+    heroStatCars: "Cars",
+    heroStatWarrantyValue: "up to 10 yrs",
+    heroStatWarranty: "Warranty",
+    heroStatExperienceValue: "10+ yrs",
+    heroStatExperience: "Experience",
 
     carSedan: "Sedan / Hatchback",
     carCrossover: "Crossover / Compact SUV",

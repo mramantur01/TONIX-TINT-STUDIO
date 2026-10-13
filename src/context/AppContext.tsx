@@ -855,16 +855,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addReview = (reviewData: Omit<Review, 'id' | 'date' | 'likes' | 'verified'>) => {
+    const isCurated = Boolean(getAdminToken()) || DEV_MODE;
     const newRev: Review = {
       ...reviewData,
       id: `rev-${Date.now()}`,
       date: 'Сегодня',
-      likes: 1,
-      verified: true
+      likes: isCurated ? 1 : 0,
+      verified: isCurated // the server decides for visitors' reviews
     };
 
     // Admin adds to the curated list; visitors' reviews go to the server's public list.
-    if (getAdminToken() || DEV_MODE) {
+    if (isCurated) {
       const updated = [newRev, ...reviews];
       setReviews(updated);
       persistContent('reviews', LOCAL_STORAGE_KEYS.REVIEWS, updated);
@@ -878,9 +879,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setPublicReviews(prev => prev.map(r => (r.id === newRev.id ? review : r)));
         addNotification('Отзыв опубликован', 'Спасибо за отзыв о нашей работе!', 'success');
       })
-      .catch(() => {
+      .catch((err: Error) => {
         setPublicReviews(prev => prev.filter(r => r.id !== newRev.id));
-        addNotification('Отзыв не отправлен', 'Не удалось сохранить отзыв. Попробуйте позже.', 'alert');
+        if (err.message === 'login_required') {
+          addNotification('Войдите в кабинет', 'Отзывы оставляют клиенты студии из личного кабинета.', 'alert');
+          setIsCabinetOpen(true);
+        } else if (err.message === 'too_soon') {
+          addNotification('Отзыв уже оставлен', 'Следующий отзыв можно оставить через сутки.', 'alert');
+        } else {
+          addNotification('Отзыв не отправлен', 'Не удалось сохранить отзыв. Попробуйте позже.', 'alert');
+        }
       });
   };
 

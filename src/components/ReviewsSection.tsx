@@ -10,11 +10,24 @@ import {
   Send,
   Sparkles
 } from 'lucide-react';
+import { reviewStats, reviewsCountLabel } from '../utils/reviewStats';
 
 export const ReviewsSection: React.FC = () => {
-  const { t, reviews, addReview } = useApp();
+  const {
+    t,
+    language,
+    reviews,
+    masters,
+    addReview,
+    isClientLoggedIn,
+    isAdminAuthed,
+    clientProfile,
+    setIsCabinetOpen,
+    addNotification
+  } = useApp();
   const [filterRating, setFilterRating] = useState<number | 'all'>('all');
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
+  const stats = reviewStats(reviews);
 
   // Form state
   const [authorName, setAuthorName] = useState('');
@@ -22,7 +35,19 @@ export const ReviewsSection: React.FC = () => {
   const [serviceName, setServiceName] = useState('Бронирование «Зоны риска» STEK');
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
-  const [masterName, setMasterName] = useState('Кадырбеков Арген');
+  const [masterName, setMasterName] = useState(masters[0]?.name || '');
+
+  // Reviews come from studio clients: visitors sign in to the cabinet first.
+  const openWriteModal = () => {
+    if (!isClientLoggedIn && !isAdminAuthed) {
+      addNotification('Войдите в кабинет', 'Отзывы оставляют клиенты студии из личного кабинета.', 'info');
+      setIsCabinetOpen(true);
+      return;
+    }
+    if (!authorName && clientProfile) setAuthorName(clientProfile.name);
+    if (!masterName && masters[0]) setMasterName(masters[0].name);
+    setIsWriteModalOpen(true);
+  };
 
   const filteredReviews = reviews.filter(r => {
     if (filterRating === 'all') return true;
@@ -69,19 +94,19 @@ export const ReviewsSection: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-4">
             <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl flex items-center gap-3">
-              <div className="text-3xl font-black text-amber-400">4.9</div>
+              <div className="text-3xl font-black text-amber-400">{stats.average}</div>
               <div>
                 <div className="flex text-amber-400">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
                   ))}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">520+ проверенных оценок</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">{reviewsCountLabel(language, stats.count)}</div>
               </div>
             </div>
 
             <button
-              onClick={() => setIsWriteModalOpen(true)}
+              onClick={openWriteModal}
               className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
@@ -225,10 +250,9 @@ export const ReviewsSection: React.FC = () => {
                     onChange={e => setMasterName(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
                   >
-                    <option value="Кадырбеков Арген">Кадырбеков Арген (Шеф-мастер)</option>
-                    <option value="Азамат Ибраимов">Азамат Ибраимов (PPF)</option>
-                    <option value="Эркин Бакиров">Эркин Бакиров (Винил)</option>
-                    <option value="Руслан Мусаев">Руслан Мусаев (Керамика)</option>
+                    {masters.map(m => (
+                      <option key={m.id} value={m.name}>{m.name} ({m.role})</option>
+                    ))}
                   </select>
                 </div>
               </div>

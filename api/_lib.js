@@ -53,6 +53,69 @@ export async function getJson(key, fallback = null) {
 
 export const setJson = (key, value) => redis(['SET', key, JSON.stringify(value)]);
 
+// ---- Atomic list updates -----------------------------------------------------------------
+// Bookings and reviews are JSON arrays stored under one key. Two requests doing GET + SET at
+// the same moment would silently drop one change, so these updates run inside Redis as Lua
+// scripts. If scripting fails for any reason, they fall back to a plain read-modify-write.
+
+const PREPEND_LUA = `
+local raw = redis.call('GET', KEYS[1])
+local list = {}
+if raw then list = cjson.decode(raw) end
+table.insert(list, 1, cjson.decode(ARGV[1]))
+local max = tonumber(ARGV[2])
+while #list > max do table.remove(list) end
+redis.call('SET', KEYS[1], cjson.encode(list))
+return #list`;
+
+const PATCH_LUA = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return 0 end
+local list = cjson.decode(raw)
+local fields = cjson.decode(ARGV[2])
+local found = 0
+for _, item in ipairs(list) do
+  if item.id == ARGV[1] then
+    for k, v in pairs(fields) do item[k] = v end
+    found = found + 1
+  end
+end
+if found > 0 then redis.call('SET', KEYS[1], cjson.encode(list)) end
+return found`;
+
+const REMOVE_LUA = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return 0 end
+local kept = {}
+for _, item in ipairs(cjson.decode(raw)) do
+  if item.id ~= ARGV[1] then table.insert(kept, item) end
+end
+if #kept == 0 then redis.call('SET', KEYS[1], '[]') else redis.call('SET', KEYS[1], cjson.encode(kept)) end
+return #kept`;
+
+async function runScript(script, key, args, fallback) {
+  try {
+    return await redis(['EVAL', script, '1', key, ...args]);
+  } catch (err) {
+    if (err.status !== 502) throw err;
+    console.error('Lua script failed, using read-modify-write', err);
+    return fallback(await getJson(key, []));
+  }
+}
+
+export const listPrepend = (key, item, max) =>
+  runScript(PREPEND_LUA, key, [JSON.stringify(item), String(max)], (list) =>
+    setJson(key, [item, ...list].slice(0, max))
+  );
+
+export const listPatch = (key, id, fields) =>
+  runScript(PATCH_LUA, key, [String(id), JSON.stringify(fields)], (list) =>
+    setJson(key, list.map((x) => (x.id === id ? { ...x, ...fields } : x)))
+  );
+
+export const listRemove = (key, id) =>
+  runScript(REMOVE_LUA, key, [String(id)], (list) => setJson(key, list.filter((x) => x.id !== id)));
+
 // ---- Admin auth: stateless HMAC-signed token -------------------------------------------
 
 const sign = (payload) =>

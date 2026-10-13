@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { TonixLogo } from './TonixLogo';
 import { getInstagramUrl, getInstagramUsername, getWhatsappUrl } from '../utils/socialUtils';
+import { reviewStats, reviewsCountLabel } from '../utils/reviewStats';
 
 interface HeroSlide {
   id: string;
@@ -77,7 +78,8 @@ const HERO_SLIDES: HeroSlide[] = [
 ];
 
 export const Hero: React.FC = () => {
-  const { t, setIsBookingOpen, openBookingWithPreselect, heroSlides, studioSettings, updateStudioSettings } = useApp();
+  const { t, language, reviews, setIsBookingOpen, openBookingWithPreselect, heroSlides, studioSettings, updateStudioSettings } = useApp();
+  const rating = reviewStats(reviews);
   const slides = heroSlides && heroSlides.length > 0 ? heroSlides : [];
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
@@ -261,22 +263,22 @@ export const Hero: React.FC = () => {
             <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-800/80 text-center">
               <div>
                 <div className="text-sm font-extrabold text-amber-400">4 850+</div>
-                <div className="text-[10px] text-slate-400">Авто</div>
+                <div className="text-[10px] text-slate-400">{t.heroStatCars}</div>
               </div>
               <div>
-                <div className="text-sm font-extrabold text-white">до 10 лет</div>
-                <div className="text-[10px] text-slate-400">Гарантия</div>
+                <div className="text-sm font-extrabold text-white">{t.heroStatWarrantyValue}</div>
+                <div className="text-[10px] text-slate-400">{t.heroStatWarranty}</div>
               </div>
               <div>
-                <div className="text-sm font-extrabold text-white">10+ лет</div>
-                <div className="text-[10px] text-slate-400">Опыт</div>
+                <div className="text-sm font-extrabold text-white">{t.heroStatExperienceValue}</div>
+                <div className="text-[10px] text-slate-400">{t.heroStatExperience}</div>
               </div>
               <div>
                 <div className="flex items-center justify-center gap-0.5 text-sm font-extrabold text-amber-400">
                   <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                  <span>5.0</span>
+                  <span>{rating.average}</span>
                 </div>
-                <div className="text-[10px] text-slate-400">520+ отзывов</div>
+                <div className="text-[10px] text-slate-400">{reviewsCountLabel(language, rating.count)}</div>
               </div>
             </div>
 

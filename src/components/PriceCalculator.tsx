@@ -13,97 +13,13 @@ import {
   Layers,
   Info
 } from 'lucide-react';
-
-interface CalcOption {
-  id: string;
-  title: string;
-  category: 'tinting' | 'ppf' | 'vinyl' | 'detailing';
-  prices: Record<CarCategory, number>;
-  hours: number;
-  warrantyYears: number;
-  description: string;
-}
-
-const CALC_OPTIONS: CalcOption[] = [
-  {
-    id: 'opt-tint-rear',
-    title: 'Тонировка задней полусферы (ГОСТ КР)',
-    category: 'tinting',
-    prices: { sedan: 4500, crossover: 5500, suv: 6500, premium: 8000 },
-    hours: 2,
-    warrantyYears: 7,
-    description: 'Задние боковые + заднее стекло. Разрешение МВД не требуется.'
-  },
-  {
-    id: 'opt-tint-front',
-    title: 'Тонировка передних боковых стекол',
-    category: 'tinting',
-    prices: { sedan: 3500, crossover: 4000, suv: 4500, premium: 5500 },
-    hours: 1.5,
-    warrantyYears: 7,
-    description: 'Платное разрешение в ГУ «Унаа» (бесплатно помогаем оформить в Түндүк).'
-  },
-  {
-    id: 'opt-tint-atherm',
-    title: 'Атермальная пленка (Лобовое + боковые)',
-    category: 'tinting',
-    prices: { sedan: 8000, crossover: 9500, suv: 11000, premium: 14000 },
-    hours: 2.5,
-    warrantyYears: 8,
-    description: 'Отражение 88% солнечного жара. Проходит ГОСТ по светопропусканию.'
-  },
-  {
-    id: 'opt-ppf-risk',
-    title: 'Бронирование «Зоны риска» (PPF полиуретан)',
-    category: 'ppf',
-    prices: { sedan: 45000, crossover: 52000, suv: 60000, premium: 75000 },
-    hours: 8,
-    warrantyYears: 10,
-    description: 'Капот целиком, бампер, фары, передние крылья, зеркала, пороги.'
-  },
-  {
-    id: 'opt-ppf-full',
-    title: 'Полное бронирование кузова (Full PPF)',
-    category: 'ppf',
-    prices: { sedan: 140000, crossover: 165000, suv: 190000, premium: 240000 },
-    hours: 24,
-    warrantyYears: 10,
-    description: '100% кузова в американский антигравийный полиуретан STEK / LLumar.'
-  },
-  {
-    id: 'opt-dechrome',
-    title: 'Комплекс «Антихром» (Shadow Line)',
-    category: 'vinyl',
-    prices: { sedan: 12000, crossover: 15000, suv: 18000, premium: 22000 },
-    hours: 4,
-    warrantyYears: 4,
-    description: 'Оклейка хрома оконных молдингов, решетки и зеркал в черный глянец.'
-  },
-  {
-    id: 'opt-vinyl-full',
-    title: 'Полная смена цвета винилом',
-    category: 'vinyl',
-    prices: { sedan: 75000, crossover: 88000, suv: 105000, premium: 135000 },
-    hours: 20,
-    warrantyYears: 5,
-    description: 'Avery Dennison / 3M. Более 300 оттенков: Nardo, Satin Black и др.'
-  },
-  {
-    id: 'opt-ceramic',
-    title: 'Полировка кузова + Керамика 9H Pro',
-    category: 'detailing',
-    prices: { sedan: 18000, crossover: 22000, suv: 26000, premium: 32000 },
-    hours: 10,
-    warrantyYears: 3,
-    description: 'Глубокая восстановительная полировка + 2 слоя нанокерамики.'
-  }
-];
+import { discountedPrice, findPromotion, PROMO_CATEGORY_LABELS, servicePrice } from '../utils/pricing';
 
 export const PriceCalculator: React.FC = () => {
-  const { t, openBookingWithPreselect, activePromoCode, setActivePromoCode } = useApp();
+  const { t, services, promotions, openBookingWithPreselect, activePromoCode, setActivePromoCode } = useApp();
 
   const [selectedCategory, setSelectedCategory] = useState<CarCategory>('crossover');
-  const [selectedOptions, setSelectedOptions] = useState<string[]>(['opt-tint-rear', 'opt-ppf-risk']);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>(['tint-rear', 'ppf-risk-zones']);
   const [selectedFilmBrand, setSelectedFilmBrand] = useState<string>('STEK DYNOshield / LLumar (USA)');
   const [promoInput, setPromoInput] = useState<string>(activePromoCode || '');
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
@@ -133,31 +49,26 @@ export const PriceCalculator: React.FC = () => {
   };
 
   const applyPromo = () => {
-    const code = promoInput.trim().toUpperCase();
-    if (code === 'BISHKEK_PPF20' || code === 'PPF20') {
-      setActivePromoCode('BISHKEK_PPF20');
-      setPromoMessage('✅ Промокод активирован: скидка 20% на услуги!');
-    } else if (code === 'LLUMAR_WEB15' || code === 'WEB15') {
-      setActivePromoCode('LLUMAR_WEB15');
-      setPromoMessage('✅ Промокод активирован: скидка 15%!');
-    } else if (code.length > 0) {
+    const promo = findPromotion(promotions, promoInput);
+    if (promo) {
+      setActivePromoCode(promo.code);
+      const scope = promo.serviceCategory ? ` на ${PROMO_CATEGORY_LABELS[promo.serviceCategory] || 'услуги акции'}` : '';
+      setPromoMessage(`✅ Промокод активирован: скидка ${promo.discountPercent}%${scope}!`);
+    } else if (promoInput.trim().length > 0) {
       setPromoMessage('❌ Промокод не найден или истек срок действия');
     }
   };
 
-  const discountPercent = useMemo(() => {
-    if (activePromoCode === 'BISHKEK_PPF20') return 0.20;
-    if (activePromoCode === 'LLUMAR_WEB15') return 0.15;
-    return 0;
-  }, [activePromoCode]);
+  const activePromo = useMemo(() => findPromotion(promotions, activePromoCode), [promotions, activePromoCode]);
 
   const calculation = useMemo(() => {
-    const activeOpts = CALC_OPTIONS.filter(o => selectedOptions.includes(o.id));
-    const baseTotal = activeOpts.reduce((acc, opt) => acc + opt.prices[selectedCategory], 0);
+    const activeOpts = services.filter(s => selectedOptions.includes(s.id));
     const filmMult = filmBrands.find(b => b.name === selectedFilmBrand)?.multiplier || 1;
+    const baseTotal = activeOpts.reduce((acc, s) => acc + servicePrice(s, selectedCategory), 0);
+    const discountedTotal = activeOpts.reduce((acc, s) => acc + discountedPrice(s, selectedCategory, activePromo), 0);
     const rawTotal = Math.round(baseTotal * filmMult);
-    const finalTotal = Math.round(rawTotal * (1 - discountPercent));
-    const totalHours = activeOpts.reduce((acc, opt) => acc + opt.hours, 0);
+    const finalTotal = Math.round(discountedTotal * filmMult);
+    const totalHours = Math.round(activeOpts.reduce((acc, s) => acc + s.durationHours, 0) * 10) / 10;
 
     return {
       rawTotal,
@@ -166,7 +77,7 @@ export const PriceCalculator: React.FC = () => {
       totalHours,
       activeOpts
     };
-  }, [selectedCategory, selectedOptions, selectedFilmBrand, discountPercent]);
+  }, [services, selectedCategory, selectedOptions, selectedFilmBrand, activePromo]);
 
   return (
     <section id="calculator" className="py-20 relative">
@@ -234,9 +145,9 @@ export const PriceCalculator: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {CALC_OPTIONS.map(opt => {
+                {services.map(opt => {
                   const isSelected = selectedOptions.includes(opt.id);
-                  const price = opt.prices[selectedCategory];
+                  const price = servicePrice(opt, selectedCategory);
 
                   return (
                     <div
@@ -250,8 +161,8 @@ export const PriceCalculator: React.FC = () => {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="font-bold text-sm text-slate-100">{opt.title}</div>
-                          <div className="text-xs text-slate-400 mt-0.5 line-clamp-2">{opt.description}</div>
+                          <div className="font-bold text-sm text-slate-100">{opt.titleKey}</div>
+                          <div className="text-xs text-slate-400 mt-0.5 line-clamp-2">{opt.descriptionKey}</div>
                         </div>
                         <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
                           isSelected ? 'bg-amber-500 text-slate-950 font-black' : 'border border-slate-700'
@@ -265,7 +176,7 @@ export const PriceCalculator: React.FC = () => {
                           {price.toLocaleString()} KGS
                         </span>
                         <div className="flex items-center gap-2 text-slate-400 text-[11px]">
-                          <span>~{opt.hours} ч.</span>
+                          <span>~{opt.durationHours} ч.</span>
                           <span>•</span>
                           <span>{opt.warrantyYears} лет гар.</span>
                         </div>
@@ -319,9 +230,9 @@ export const PriceCalculator: React.FC = () => {
                     {calculation.finalTotal.toLocaleString()} <span className="text-amber-400 text-xl font-bold">KGS</span>
                   </div>
                 </div>
-                {discountPercent > 0 && (
+                {activePromo && calculation.savings > 0 && (
                   <div className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold">
-                    -{discountPercent * 100}% Скидка
+                    -{activePromo.discountPercent}% Скидка
                   </div>
                 )}
               </div>
@@ -344,9 +255,9 @@ export const PriceCalculator: React.FC = () => {
                 <ul className="space-y-1.5 text-xs text-slate-400">
                   {calculation.activeOpts.map(o => (
                     <li key={o.id} className="flex items-center justify-between">
-                      <span className="truncate pr-2">• {o.title}</span>
+                      <span className="truncate pr-2">• {o.titleKey}</span>
                       <span className="text-slate-200 shrink-0 font-medium">
-                        {o.prices[selectedCategory].toLocaleString()} KGS
+                        {servicePrice(o, selectedCategory).toLocaleString()} KGS
                       </span>
                     </li>
                   ))}
@@ -390,8 +301,7 @@ export const PriceCalculator: React.FC = () => {
               {/* Book Button */}
               <button
                 onClick={() => {
-                  const firstServiceId = calculation.activeOpts[0]?.id?.replace('opt-', '') || 'tint-rear';
-                  openBookingWithPreselect(firstServiceId, selectedCategory);
+                  openBookingWithPreselect(calculation.activeOpts[0]?.id || services[0]?.id, selectedCategory);
                 }}
                 className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
