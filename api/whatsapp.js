@@ -8,7 +8,14 @@ import { createRequire } from 'node:module';
 import Anthropic from '@anthropic-ai/sdk';
 import { getJson, notifyTelegram, redis, storageConfigured } from './_lib.js';
 
-const catalog = createRequire(import.meta.url)('../src/data/catalog.json');
+// Same catalog the site uses (vercel.json includes the file in this function). If it is ever
+// missing, the bot still runs on what the admin panel saved in the database.
+let catalog = { services: [], promotions: [], faqs: [], timeSlots: ['09:00', '11:30', '14:00', '16:30', '19:00'] };
+try {
+  catalog = createRequire(import.meta.url)('../src/data/catalog.json');
+} catch (err) {
+  console.error('catalog.json not found, using database content only', err);
+}
 
 const env = (name) => process.env[name] || '';
 const MODEL = env('WHATSAPP_BOT_MODEL') || 'claude-opus-5-5';
@@ -29,7 +36,7 @@ const json = (status, body) =>
 
 // ---- Meta webhook verification ------------------------------------------------------------
 
-export function GET(request) {
+function verifyWebhook(request) {
   const url = new URL(request.url);
   const ok =
     url.searchParams.get('hub.mode') === 'subscribe' &&
@@ -291,7 +298,7 @@ async function handleMessage(msg, contactName) {
   }
 }
 
-export async function POST(request) {
+async function receiveMessages(request) {
   const raw = await request.text();
   if (!signatureValid(raw, request.headers.get('x-hub-signature-256'))) return json(401, { error: 'bad_signature' });
   if (!configured()) return json(200, { ignored: 'not_configured' });
@@ -316,3 +323,12 @@ export async function POST(request) {
   results.filter((r) => r.status === 'rejected').forEach((r) => console.error('WhatsApp message failed', r.reason));
   return json(200, { ok: true });
 }
+
+// Vercel's Web-handler shape for functions outside a framework.
+export default {
+  async fetch(request) {
+    if (request.method === 'GET') return verifyWebhook(request);
+    if (request.method === 'POST') return receiveMessages(request);
+    return json(405, { error: 'method_not_allowed' });
+  },
+};
