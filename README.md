@@ -26,6 +26,19 @@
 3. **Telegram (по желанию).** Создайте бота у @BotFather, добавьте `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` (ID чата, куда слать записи).
 4. **Deployments → … → Redeploy**, чтобы переменные применились.
 
+## ИИ-помощник в WhatsApp (`/api/whatsapp`)
+
+Отвечает клиентам в WhatsApp через Claude: цены по классу авто, акции и промокоды, свободное время мастеров (из базы записей), адрес и часы, ссылка на запись `сайт/#booking`. По просьбе клиента зовёт менеджера (уведомление в Telegram + ссылка на WhatsApp менеджера). Сам записи не создаёт и оплату не принимает. Услуги, акции и FAQ берутся из `src/data/catalog.json` (или из админки, если их там меняли).
+
+1. developers.facebook.com → **Create App** → use case «Connect with customers through WhatsApp» → **API Setup**: номер для бота, **Phone number ID**.
+2. Business Settings → **System users** → токен с правами `whatsapp_business_messaging`, `whatsapp_business_management` → `WHATSAPP_TOKEN`.
+3. Приложение → Settings → Basic → **App secret** → `WHATSAPP_APP_SECRET`; придумайте `WHATSAPP_VERIFY_TOKEN`.
+4. console.anthropic.com → API key → `ANTHROPIC_API_KEY`. Все переменные — в Vercel → Environment Variables, затем **Redeploy**.
+5. WhatsApp → **Configuration** → Webhook: Callback URL `https://<сайт>/api/whatsapp`, Verify token = `WHATSAPP_VERIFY_TOKEN` → Verify → подписаться на поле `messages`.
+6. В WhatsApp Manager привяжите способ оплаты: с 1 октября 2026 ответы сверх 1 000 в месяц платные, без карты Meta их не доставляет.
+
+Защита: проверка подписи каждого запроса Meta, один ответ на сообщение (повторы Meta игнорируются), не больше 20 ответов клиенту в час, история разговора хранится 3 дня.
+
 Пока база не подключена, сайт работает, но записи не сохраняются (клиент увидит просьбу позвонить), а админ-панель без `ADMIN_PASSWORD` не откроется.
 
 ## Локальная разработка

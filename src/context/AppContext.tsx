@@ -451,6 +451,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (window.location.hash === '#admin') {
         setIsAdminOpen(true);
       }
+      // Link from the WhatsApp bot: open the booking form (it asks to sign in first when needed).
+      if (window.location.hash === '#booking') {
+        setIsBookingOpen(true);
+      }
     };
     handleHashCheck();
     window.addEventListener('hashchange', handleHashCheck);
